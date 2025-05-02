@@ -167,10 +167,11 @@ class Xadrezia(keras.Model):
                                               keras.layers.BatchNormalization(),
                                               keras.layers.Activation('gelu'),
                                               ResidualConvolution(64, 32, kernel_size=4),
-                                              ResidualConvolution(128, 64, kernel_size=2)
+                                              ResidualConvolution(128, 64, kernel_size=2),
+                                              ResidualConvolution(256, 128, kernel_size=2),
                                               ])
 
-        self.mha_encoders = keras.Sequential([Encoder(128, 8)]*8)
+        self.mha_encoders = keras.Sequential([Encoder(256, 8)]*4)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -179,7 +180,7 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        pos_encoding = get_positional_encoding(128, 16)
+        pos_encoding = get_positional_encoding(256, 16)
         x = x + pos_encoding
         x = self.mha_encoders(x)
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
