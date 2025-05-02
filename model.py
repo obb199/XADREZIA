@@ -50,6 +50,14 @@ def get_positional_encoding(model_dimension, batch_size):
 
 
 class MultiHeadAttention(keras.layers.Layer):
+    """
+        Implementação de atenção multi-head para análise de posições de xadrez.
+
+        Args:
+            d_model: Dimensionalidade do modelo.
+            n_heads: Número de heads de atenção.
+            **kwargs: Argumentos adicionais para a classe Layer.
+        """
     def __init__(self, d_model, n_heads, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.d_model = d_model
@@ -113,6 +121,14 @@ class MultiHeadAttention(keras.layers.Layer):
 
 
 class Encoder(keras.layers.Layer):
+    """
+        Camada encoder com auto-atenção e feed-forward network.
+
+        Args:
+            d_model: Dimensionalidade do modelo.
+            num_heads: Número de heads de atenção.
+            **kwargs: Argumentos adicionais para a classe Layer.
+        """
     def __init__(self, d_model, num_heads, **kwargs):
         super(Encoder, self).__init__(**kwargs)
         self.d_model = d_model
@@ -136,6 +152,15 @@ class Encoder(keras.layers.Layer):
 
 
 class ResidualConvolution(keras.layers.Layer):
+    """
+        Bloco convolucional residual com conexão skip.
+
+        Args:
+            filters: Número de filtros para as camadas convolucionais.
+            prev_filters: Número de filtros da camada anterior.
+            kernel_size: Tamanho do kernel para convolução.
+            **kwargs: Argumentos adicionais para a classe Layer.
+        """
     def __init__(self, filters, prev_filters, kernel_size, **kwargs):
         super(ResidualConvolution, self).__init__(**kwargs)
         self.convs = keras.Sequential([keras.layers.Conv2D(filters, kernel_size=1, padding='same'),
@@ -161,6 +186,17 @@ class ResidualConvolution(keras.layers.Layer):
 
 
 class Xadrezia(keras.Model):
+    """
+        Modelo principal para análise e predição de movimentos de xadrez.
+
+        Arquitetura:
+            - Blocos convolucionais residuais
+            - Encoders com auto-atenção
+            - Heads para predição de movimento, coluna e linha
+
+        Métodos:
+            call(x): Processa a entrada e retorna predições concatenadas.
+        """
     def __init__(self, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.convolutions = keras.Sequential([keras.layers.Conv2D(32, kernel_size=8, padding='same', strides=1),
@@ -168,7 +204,9 @@ class Xadrezia(keras.Model):
                                               keras.layers.Activation('gelu'),
                                               ResidualConvolution(64, 32, kernel_size=4),
                                               ResidualConvolution(128, 64, kernel_size=2),
+                                              ResidualConvolution(128, 128, kernel_size=2),
                                               ResidualConvolution(256, 128, kernel_size=2),
+                                              ResidualConvolution(256, 256, kernel_size=2),
                                               ])
 
         self.mha_encoders = keras.Sequential([Encoder(256, 8)]*4)

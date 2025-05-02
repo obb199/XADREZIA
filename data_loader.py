@@ -7,6 +7,20 @@ from move_dict import MOVE_TO_IDX, VALID_MOVES
 
 
 class DataGenerator(keras.utils.Sequence):
+    """
+        Gerador de dados para treinamento de modelos de xadrez.
+
+        Esta classe implementa um gerador de dados que processa partidas de xadrez,
+        gera estados de tabuleiro e movimentos correspondentes, e fornece batches
+        para treinamento de modelos de aprendizado de máquina.
+
+        Args:
+            games: Lista de partidas de xadrez a serem processadas.
+            batch_size: Número de partidas por batch (padrão: 1).
+            moves_per_game: Número máximo de movimentos a serem considerados por partida (padrão: 16).
+            shuffle: Booleano indicando se os dados devem ser embaralhados após cada época (padrão: True).
+            for_white_generation: Booleano indicando se deve gerar dados para movimentos das brancas (padrão: True).
+        """
     def __init__(self, games,
                  batch_size=1,
                  moves_per_game=16,
@@ -23,10 +37,25 @@ class DataGenerator(keras.utils.Sequence):
         self.indexes = np.arange(len(self.games))
 
     def __len__(self):
-        """Denotes the number of batches per epoch"""
+        """
+       Calcula o número de batches por época.
+
+       Returns:
+           Número inteiro representando o número de batches por época.
+        """
         return int(np.floor(len(self.games) / self.batch_size))
 
     def __choice_data(self, X, y):
+        """
+        Seleciona aleatoriamente amostras dos dados gerados e aplica one-hot encoding aos rótulos.
+
+        Args:
+            X: Lista de estados de tabuleiro.
+            y: Lista de movimentos correspondentes.
+
+        Returns:
+            Tupla contendo (dados de entrada processados, rótulos em formato one-hot).
+        """
         sorted_idx = np.random.randint(low=0, high=len(X), size=self.batch_size)
 
         final_X, final_y = [], []
@@ -50,7 +79,15 @@ class DataGenerator(keras.utils.Sequence):
         return final_X, sparse_final_y
 
     def __getitem__(self, index):
-        'Generate one batch of data'
+        """
+        Gera um batch de dados.
+
+        Args:
+            index: Índice do batch a ser gerado.
+
+        Returns:
+            Tupla contendo (features, labels) para o batch solicitado.
+        """
         # Generate indexes of the batch
         indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
 
@@ -64,12 +101,27 @@ class DataGenerator(keras.utils.Sequence):
         return np.array(X), np.array(y)
 
     def on_epoch_end(self):
-        """Updates indexes after each epoch"""
+        """
+        Atualiza os índices após cada época, opcionalmente embaralhando os dados.
+        """
+
         self.indexes = np.arange(len(self.games))
         np.random.shuffle(self.indexes)
 
     def __data_generation(self, game):
-        """Generates data containing batch_size samples"""
+        """
+        Gera dados de treinamento a partir de uma partida de xadrez.
+
+        Processa cada movimento da partida, atualiza o estado do tabuleiro e
+        armazena os pares (estado, movimento) para treinamento.
+
+        Args:
+            game: Partida de xadrez a ser processada.
+
+        Returns:
+            Tupla contendo (lista de estados de tabuleiro, lista de movimentos correspondentes).
+        """
+
         X = []
         y = []
         boardgame = generate_start_table()

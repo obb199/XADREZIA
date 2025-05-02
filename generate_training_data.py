@@ -7,6 +7,15 @@ from pieces import NOTE_CONVERTION, WHITE_CONVERTION, BLACK_CONVERTION
 
 
 def generate_uniques_matches(input_path):
+    """
+        Processa um arquivo de partidas de xadrez e extrai partidas individuais.
+
+        Args:
+            input_path: Caminho para o arquivo contendo as partidas brutas.
+
+        Returns:
+            Lista de strings, onde cada string representa uma partida única sem informações de resultado.
+        """
     def data_filter(data):
         return True if data[0] != '[' and data[0] != '\n' else False
 
@@ -24,6 +33,15 @@ def generate_uniques_matches(input_path):
 
 
 def sequence_of_moves(unique_match):
+    """
+        Extrai a sequência de movimentos de uma partida de xadrez.
+
+        Args:
+            unique_match: String contendo uma partida completa com movimentos.
+
+        Returns:
+            Lista de movimentos individuais limpos, sem números de turno.
+        """
     unique_match = unique_match.split(' ')
     for idx, move in enumerate(unique_match):
         if '.' in move:
@@ -48,6 +66,15 @@ def compare_pieces(piece_1: np.ndarray, piece_2: np.ndarray) -> bool:
 
 
 def find_kings(table):
+    """
+        Localiza as posições dos reis branco e preto no tabuleiro.
+
+        Args:
+            table: Tabuleiro de xadrez representado como um array numpy 8x8x7.
+
+        Returns:
+            Tupla contendo ((col_white, row_white), (col_black, row_black)) com as posições dos reis.
+        """
     white_king_position, black_king_position = None, None
 
     for i in range(8):
@@ -64,6 +91,17 @@ def find_kings(table):
 
 
 def find_controlled_squares(table, i, j):
+    """
+        Identifica todos os quadrados controlados por uma peça específica.
+
+        Args:
+            table: Tabuleiro de xadrez 8x8x7.
+            i: Índice da coluna da peça.
+            j: Índice da linha da peça.
+
+        Returns:
+            Tupla contendo (lista de quadrados controlados, informações da peça).
+        """
     if compare_pieces(table[i, j], WHITE_PAWN) or compare_pieces(table[i, j], BLACK_PAWN):
         return pawn_control(i, j, True) if table[i, j, -1] == 1 else pawn_control(i, j, False)
     if compare_pieces(table[i, j, :-1], WHITE_KNIGHT[:-1]):
@@ -79,6 +117,17 @@ def find_controlled_squares(table, i, j):
 
 
 def pawn_control(col, row, is_white):
+    """
+        Calcula os quadrados controlados por um peão.
+
+        Args:
+            col: Coluna atual do peão.
+            row: Linha atual do peão.
+            is_white: Booleano indicando se o peão é branco.
+
+        Returns:
+            Tupla (quadrados controlados, ['pawn', col, row]).
+        """
     controlled_squares_list = []
     if is_white:
         if col + 1 <= 7 and row - 1 >= 0:
@@ -95,6 +144,18 @@ def pawn_control(col, row, is_white):
 
 
 def bishop_control(table, col, row):
+    """
+        Calcula os quadrados controlados por um bispo.
+
+        Args:
+            table: Tabuleiro de xadrez.
+            col: Coluna atual do bispo.
+            row: Linha atual do bispo.
+
+        Returns:
+            Tupla (quadrados controlados, ['bishop', col, row]).
+        """
+
     controlled_squares_list = []
 
     directions = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
@@ -111,6 +172,16 @@ def bishop_control(table, col, row):
 
 
 def knight_control(i, j):
+    """
+        Calcula os quadrados controlados por um cavalo.
+
+        Args:
+            i: Coluna atual do cavalo.
+            j: Linha atual do cavalo.
+
+        Returns:
+            Tupla (quadrados controlados, ['knight', i, j]).
+        """
     controlled_squares_list = []
     pos = [(i + 2, j + 1), (i + 2, j - 1),
            (i - 2, j + 1), (i - 2, j - 1),
@@ -125,6 +196,17 @@ def knight_control(i, j):
 
 
 def rook_control(table, col, row):
+    """
+        Calcula os quadrados controlados por uma torre.
+
+        Args:
+            table: Tabuleiro de xadrez.
+            col: Coluna atual da torre.
+            row: Linha atual da torre.
+
+        Returns:
+            Tupla (quadrados controlados, ['rook', col, row]).
+        """
     controlled_squares_list = []
     for x in range(row + 1, 8):
         controlled_squares_list.append([col, x])
@@ -150,6 +232,16 @@ def rook_control(table, col, row):
 
 
 def king_control(col, row):
+    """
+        Calcula os quadrados controlados por um rei.
+
+        Args:
+            col: Coluna atual do rei.
+            row: Linha atual do rei.
+
+        Returns:
+            Tupla (quadrados controlados, ['king', col, row]).
+        """
     controlled_squares_list = []
     for x in [0, 1, -1]:
         for y in [0, 1, -1]:
@@ -162,6 +254,18 @@ def king_control(col, row):
 
 
 def queen_control(table, col, row):
+    """
+        Calcula os quadrados controlados por uma rainha.
+
+        Args:
+            table: Tabuleiro de xadrez.
+            col: Coluna atual da rainha.
+            row: Linha atual da rainha.
+
+        Returns:
+            Tupla (quadrados controlados, ['queen', col, row]).
+        """
+
     bishop_like_control = list(bishop_control(table, col, row)[0])
     rook_like_control = list(rook_control(table, col, row)[0])
     controlled_squares_list = bishop_like_control + rook_like_control
@@ -170,6 +274,15 @@ def queen_control(table, col, row):
 
 
 def verify_check(table):
+    """
+        Verifica se algum rei está em xeque.
+
+        Args:
+            table: Tabuleiro de xadrez 8x8x7.
+
+        Returns:
+            Tupla (white_in_check, black_in_check) indicando quais reis estão em xeque.
+        """
     whites_in_check, blacks_in_check = False, False
 
     white_king_position, black_king_position = find_kings(table)
