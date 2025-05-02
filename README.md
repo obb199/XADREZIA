@@ -18,6 +18,8 @@ O repositório contém scripts em Python que implementam os componentes principa
 
 **table.py:** Implementa a representação do tabuleiro de xadrez, incluindo métodos para gerar o tensor 8x8x7 com informações sobre todas as peças.
 
+**training.py:** Loop de treino do modelo.
+
 **inference.py:** Realiza inferência com o modelo treinado, recebendo um tensor de tabuleiro e produzindo um vetor de probabilidades para selecionar movimentos.
 
 **model.py:** Define a arquitetura da rede neural, composta por uma convolução 2D inicial, convoluções residuais 2D e um Transformer encoder-only.
