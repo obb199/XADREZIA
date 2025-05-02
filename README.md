@@ -26,7 +26,7 @@ O repositório contém scripts em Python que implementam os componentes principa
 
 **model.py:** Define a arquitetura da rede neural, composta por uma convolução 2D inicial, convoluções residuais 2D e um Transformer encoder-only.
 
-**utils.py:** Contém funções utilitárias, como conversão de formatos, validação de movimentos ou manipulação de tensores, compartilhadas entre os outros scripts.
+**utils.py:** Contém funções utilitárias, compartilhadas entre os outros scripts.
 
 ## Arquitetura da Rede Neural
 
