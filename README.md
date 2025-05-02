@@ -1,10 +1,6 @@
 # XADREZIA
 
-### XADREZIA é um projeto experimental para desenvolver uma engine de xadrez baseada exclusivamente em reconhecimento de padrões com redes neurais. Ao contrário de engines tradicionais que utilizam busca em árvore (como Minimax ou Monte Carlo Tree Search), XADREZIA emprega redes neurais para avaliar posições e selecionar movimentos, explorando o potencial do aprendizado de máquina no xadrez. O projeto está em fase inicial e é voltado para pesquisa e experimentação.
-
-## Objetivo
-
-Construir uma engine de xadrez que aprende a jogar por meio de uma rede neural, utilizando representações do tabuleiro como entrada para prever movimentos com base em probabilidades.
+### Xadrezia é um projeto experimental para desenvolver uma engine de xadrez baseada exclusivamente em reconhecimento de padrões em jogos dos melhores enxadristas do mundo. Ao contrário de engines tradicionais que utilizam busca em árvore (como Minimax ou Monte Carlo Tree Search ou técnicas baseadas em força bruta), Xadrezia emprega redes neurais para avaliar posições e selecionar movimentos, explorando o potencial do aprendizado de máquina no xadrez. O projeto está em fase inicial e é voltado para pesquisa, experimentação, diversão e curiosidade!
 
 ## Estrutura do Repositório
 
@@ -50,11 +46,11 @@ Cada elemento do tensor indica a presença (ou ausência) de uma peça em uma ca
 
 **O output da rede é um vetor de probabilidades que codifica:**
 
-O movimento selecionado - movimento específico, coluna de orimge e linha de origem (ex: "c5", "De2", "Bg4").
+O movimento selecionado - movimento específico, coluna de origem e linha de origem (ex: "c5", "De2", "Bg4").
 
 O vetor contém probabilidades para todos os movimentos possíveis, mapeados via move_dict.py. Por exemplo, o índice do vetor pode corresponder a um movimento específico, como "mover o peão de e2 para e4".
 
-Durante a inferência, o movimento com maior probabilidade é selecionado.
+Durante a inferência, o movimento válido de maior probabilidade é selecionado.
 
 ### Arquitetura
 
