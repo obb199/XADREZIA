@@ -84,6 +84,6 @@ O Transformer modela relações de longo alcance entre casas e peças, capturand
 
 Usa atenção multi-cabeça (multi-head attention) para priorizar informações relevantes.
 
-A saída do Transformer é processada por uma camada densa para produzir o vetor de probabilidades.
+A saída do Transformer é processada por uma camada densa para produzir o vetor de probabilidades, que é decodificando em um lance.
 
 ![engine vs human](https://sdmntprwestus.oaiusercontent.com/files/00000000-f1f8-6230-98b5-085b88fc7147/raw?se=2025-05-02T22%3A22%3A50Z&sp=r&sv=2024-08-04&sr=b&scid=b77e90ee-bb50-5c51-bf70-d52d9bb7c754&skoid=51916beb-8d6a-49b8-8b29-ca48ed86557e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-05-02T20%3A37%3A35Z&ske=2025-05-03T20%3A37%3A35Z&sks=b&skv=2024-08-04&sig=sMeg9UmUBNngent2CRI/Z7HXn5yJaViJjZr%2B85OW5BM%3D)
