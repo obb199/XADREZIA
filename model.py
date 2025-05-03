@@ -237,13 +237,14 @@ class Xadrezia(keras.Model):
 """
     def __init__(self, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(256, kernel_size=8, padding='same', strides=1),
+        self.convolutions = keras.Sequential([keras.layers.Conv2D(128, kernel_size=8, padding='same', strides=1),
                                               keras.layers.BatchNormalization(),
                                               keras.layers.Activation('gelu'),
-                                              ResidualConvolution(512, 256, kernel_size=4, strides=1),
+                                              ResidualConvolution(256, 128, kernel_size=4, strides=1),
+                                              ResidualConvolution(512, 256, kernel_size=2, strides=2),
                                               ])
 
-        self.mha_encoders = keras.Sequential([Encoder(512, 8, 8, 8)]*2)
+        self.mha_encoders = keras.Sequential([Encoder(512, 8, 4, 4)]*2)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -252,7 +253,7 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        pos_encoding = get_positional_encoding(batch_size=16, height=8, width=8, d_model=512)
+        pos_encoding = get_positional_encoding(batch_size=16, height=4, width=4, d_model=512)
         x = x + pos_encoding
         x = self.mha_encoders(x)
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
