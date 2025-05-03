@@ -2,9 +2,9 @@ cols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 rows = ['1', '2', '3', '4', '5', '6', '7', '8']
 pieces = ['', 'N', 'B', 'R', 'Q', 'K']
 
-IDX_TO_MOVE = {}
-MOVE_TO_IDX = {}
-VALID_MOVES = []
+IDX_TO_MOVE = {}  # Dictionary to map index to move string
+MOVE_TO_IDX = {}  # Dictionary to map move string to index
+VALID_MOVES = []  # List to store all valid moves
 
 idx = 0
 for c in cols:
@@ -15,6 +15,7 @@ for c in cols:
             VALID_MOVES.append(p+c+r)
             idx += 1
 
+# Add castling moves manually
 MOVE_TO_IDX['O-O'] = len(MOVE_TO_IDX)
 IDX_TO_MOVE[len(MOVE_TO_IDX)] = 'O-O'
 

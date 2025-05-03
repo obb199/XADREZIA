@@ -8,19 +8,19 @@ from move_dict import MOVE_TO_IDX, VALID_MOVES
 
 class DataGenerator(keras.utils.Sequence):
     """
-        Gerador de dados para treinamento de modelos de xadrez.
+        Data generator for training chess models.
 
-        Esta classe implementa um gerador de dados que processa partidas de xadrez,
-        gera estados de tabuleiro e movimentos correspondentes, e fornece batches
-        para treinamento de modelos de aprendizado de máquina.
+        This class implements a data generator that processes chess games,
+        generates board states and corresponding moves, and provides batches
+        for training machine learning models.
 
         Args:
-            games: Lista de partidas de xadrez a serem processadas.
-            batch_size: Número de partidas por batch (padrão: 1).
-            moves_per_game: Número máximo de movimentos a serem considerados por partida (padrão: 16).
-            shuffle: Booleano indicando se os dados devem ser embaralhados após cada época (padrão: True).
-            for_white_generation: Booleano indicando se deve gerar dados para movimentos das brancas (padrão: True).
-        """
+            games: List of chess games to be processed.
+            batch_size: Number of games per batch (default: 1).
+            moves_per_game: Maximum number of moves to be considered per game (default: 16).
+            shuffle: Boolean indicating whether to shuffle the data after each epoch (default: True).
+            for_white_generation: Boolean indicating whether to generate data for white moves (default: True).
+"""
     def __init__(self, games,
                  batch_size=1,
                  moves_per_game=16,
@@ -38,24 +38,24 @@ class DataGenerator(keras.utils.Sequence):
 
     def __len__(self):
         """
-       Calcula o número de batches por época.
+       Calculates the number of batches per epoch.
 
        Returns:
-           Número inteiro representando o número de batches por época.
-        """
+           Integer representing the number of batches per epoch.
+"""
         return int(np.floor(len(self.games) / self.batch_size))
 
     def __choice_data(self, X, y):
         """
-        Seleciona aleatoriamente amostras dos dados gerados e aplica one-hot encoding aos rótulos.
+        Randomly selects samples from the generated data and applies one-hot encoding to the labels.
 
         Args:
-            X: Lista de estados de tabuleiro.
-            y: Lista de movimentos correspondentes.
+            X: List of board states.
+            y: List of corresponding moves.
 
         Returns:
-            Tupla contendo (dados de entrada processados, rótulos em formato one-hot).
-        """
+            Tuple containing (processed input data, labels in one-hot format).
+"""
         sorted_idx = np.random.randint(low=0, high=len(X), size=self.batch_size)
 
         final_X, final_y = [], []
@@ -80,14 +80,14 @@ class DataGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         """
-        Gera um batch de dados.
+        Generates a data batch.
 
         Args:
-            index: Índice do batch a ser gerado.
+            index: Index of the batch to be generated.
 
         Returns:
-            Tupla contendo (features, labels) para o batch solicitado.
-        """
+            Tuple containing (features, labels) for the requested batch.
+"""
         # Generate indexes of the batch
         indexes = self.indexes[index*self.batch_size:(index+1)*self.batch_size]
 
@@ -102,7 +102,7 @@ class DataGenerator(keras.utils.Sequence):
 
     def on_epoch_end(self):
         """
-        Atualiza os índices após cada época, opcionalmente embaralhando os dados.
+        Updates the indices after each epoch, optionally shuffling the data.
         """
 
         self.indexes = np.arange(len(self.games))
@@ -110,16 +110,14 @@ class DataGenerator(keras.utils.Sequence):
 
     def __data_generation(self, game):
         """
-        Gera dados de treinamento a partir de uma partida de xadrez.
+        Processes each move of the game, updates the board state, and stores
+        the (state, move) pairs for training.
 
-        Processa cada movimento da partida, atualiza o estado do tabuleiro e
-        armazena os pares (estado, movimento) para treinamento.
+    Args:
+        game: The chess game to be processed.
 
-        Args:
-            game: Partida de xadrez a ser processada.
-
-        Returns:
-            Tupla contendo (lista de estados de tabuleiro, lista de movimentos correspondentes).
+    Returns:
+        A tuple containing (list of board states, list of corresponding moves).
         """
 
         X = []

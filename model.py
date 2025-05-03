@@ -1,11 +1,9 @@
 import tensorflow as tf
 import keras
 import numpy as np
-import data_loader
-import utils
 
 
-def get_positional_encoding(model_dimension, batch_size):
+def get_positional_encoding(batch_size, height, width, d_model):
     """
     Generate a 2D positional encoding with shape (batch, height, width, d_model).
 
@@ -23,11 +21,11 @@ def get_positional_encoding(model_dimension, batch_size):
                                     containing the 2D positional encoding.
     """
     # If d_model is odd, work with d_model_even (which is d_model-1) and add one extra channel.
-    if model_dimension % 2 == 0:
-        d_model_even = model_dimension
+    if d_model % 2 == 0:
+        d_model_even = d_model
         add_extra = False
     else:
-        d_model_even = model_dimension - 1
+        d_model_even = d_model - 1
         add_extra = True
 
     # We split the encoding channels equally between rows and columns.
@@ -35,8 +33,8 @@ def get_positional_encoding(model_dimension, batch_size):
     half_dim = d_model_even // 2
 
     # Create position indices for rows and columns.
-    row_indices = np.arange(8)[:, np.newaxis]  # shape: (height, 1)
-    col_indices = np.arange(8)[:, np.newaxis]  # shape: (width, 1)
+    row_indices = np.arange(height)[:, np.newaxis]   # shape: (height, 1)
+    col_indices = np.arange(width)[:, np.newaxis]      # shape: (width, 1)
 
     # Precompute frequencies for each channel index.
     # We use a simple formulation: frequency_j = 1 / 10000^(j/half_dim)
@@ -44,8 +42,8 @@ def get_positional_encoding(model_dimension, batch_size):
     freqs = 1 / (10000 ** (j_indices / half_dim))  # shape: (half_dim,)
 
     # Initialize empty encodings for rows and columns.
-    pos_row = np.zeros((8, half_dim))
-    pos_col = np.zeros((8, half_dim))
+    pos_row = np.zeros((height, half_dim))
+    pos_col = np.zeros((width, half_dim))
 
     # Compute row encoding: for each channel use sin for even indices and cos for odd indices.
     for j in range(half_dim):
@@ -64,39 +62,39 @@ def get_positional_encoding(model_dimension, batch_size):
 
     # Expand dims so that row encoding is shaped (height, 1, half_dim) and
     # column encoding is shaped (1, width, half_dim).
-    pos_row_expanded = pos_row[:, np.newaxis, :]  # (height, 1, half_dim)
-    pos_col_expanded = pos_col[np.newaxis, :, :]  # (1, width, half_dim)
+    pos_row_expanded = pos_row[:, np.newaxis, :]        # (height, 1, half_dim)
+    pos_col_expanded = pos_col[np.newaxis, :, :]          # (1, width, half_dim)
 
     # Broadcast to shape (height, width, half_dim) and then concatenate along the channel dimension.
-    pos_row_broadcast = np.broadcast_to(pos_row_expanded, (8, 8, half_dim))
-    pos_col_broadcast = np.broadcast_to(pos_col_expanded, (8, 8, half_dim))
+    pos_row_broadcast = np.broadcast_to(pos_row_expanded, (height, width, half_dim))
+    pos_col_broadcast = np.broadcast_to(pos_col_expanded, (height, width, half_dim))
     pos_enc = np.concatenate([pos_row_broadcast, pos_col_broadcast], axis=-1)  # shape: (height, width, d_model_even)
 
     # If the desired d_model is odd, append an extra channel.
     # For the extra channel, we will use a simple combined positional signal.
     if add_extra:
         # Generate a grid of row and column indices.
-        grid_row = np.tile(np.arange(8)[:, np.newaxis], (1, 8))
-        grid_col = np.tile(np.arange(8)[np.newaxis, :], (8, 1))
-        extra_channel = np.sin((grid_row + grid_col) / (8 + 8))
+        grid_row = np.tile(np.arange(height)[:, np.newaxis], (1, width))
+        grid_col = np.tile(np.arange(width)[np.newaxis, :], (height, 1))
+        extra_channel = np.sin((grid_row + grid_col) / (height + width))
         extra_channel = extra_channel[..., np.newaxis]  # shape: (height, width, 1)
         pos_enc = np.concatenate([pos_enc, extra_channel], axis=-1)  # shape: (height, width, d_model)
 
     # Finally, add the batch dimension by tiling the same positional encoding for all items in the batch.
-    pos_enc_batch = np.broadcast_to(pos_enc, (batch_size, 8, 8, model_dimension))
+    pos_enc_batch = np.broadcast_to(pos_enc, (batch_size, height, width, d_model))
     return pos_enc_batch
 
 
 class MultiHeadAttention(keras.layers.Layer):
     """
-    Implementação de atenção multi-head para análise de posições de xadrez.
+    Multi-head attention implementation for chess position analysis.
 
     Args:
-        d_model: Dimensionalidade do modelo.
-        n_heads: Número de heads de atenção.
-        **kwargs: Argumentos adicionais para a classe Layer.
-    """
-    def __init__(self, d_model, n_heads, **kwargs):
+        d_model: Model dimensionality.
+        n_heads: Number of attention heads.
+        **kwargs: Additional arguments for the Layer class.
+"""
+    def __init__(self, d_model, n_heads, height, width, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.d_model = d_model
         self.n_heads = n_heads
@@ -105,9 +103,8 @@ class MultiHeadAttention(keras.layers.Layer):
         self.wq = keras.layers.Dense(d_model)
         self.wk = keras.layers.Dense(d_model)
         self.wv = keras.layers.Dense(d_model)
-
-        self.final_dense = keras.layers.Dense(d_model, activation='gelu')
-        self.final_reshape = keras.layers.Reshape([8, 8, d_model])  # Fixed shape assuming 8x8 grid
+        self.final_conv = ResidualConvolution(d_model, d_model, 2, 1)
+        self.final_reshape = keras.layers.Reshape([height, width, d_model])  # Fixed shape assuming 8x8 grid
 
     def split_heads(self, x):
         """
@@ -154,26 +151,26 @@ class MultiHeadAttention(keras.layers.Layer):
         pre_output = tf.reshape(pre_output, [batch_size, -1, self.d_model])  # Shape: (batch_size, 64, d_model)
 
         # Linear combination with non-linear activation
-        output = self.final_dense(pre_output)  # Shape: (batch_size, 64, d_model)
-        output = self.final_reshape(output)  # Shape: (batch_size, 8, 8, d_model)
+        output = self.final_reshape(pre_output)  # Shape: (batch_size, 8, 8, d_model)
+        output = self.final_conv(output)  # Shape: (batch_size, 8, 8, d_model)
 
         return output
 
 
 class Encoder(keras.layers.Layer):
     """
-        Camada encoder com auto-atenção e feed-forward network.
+        Encoder layer with self-attention and feed-forward network.
 
         Args:
-            d_model: Dimensionalidade do modelo.
-            num_heads: Número de heads de atenção.
-            **kwargs: Argumentos adicionais para a classe Layer.
-        """
-    def __init__(self, d_model, num_heads, **kwargs):
+            d_model: Model dimensionality.
+            num_heads: Number of attention heads.
+            **kwargs: Additional arguments for the Layer class.
+"""
+    def __init__(self, d_model, num_heads, height, width, **kwargs):
         super(Encoder, self).__init__(**kwargs)
         self.d_model = d_model
         self.num_heads = num_heads
-        self.mha = MultiHeadAttention(d_model, num_heads)
+        self.mha = MultiHeadAttention(d_model, num_heads, height, width)
         self.norm_1 = keras.layers.LayerNormalization()
         self.norm_2 = keras.layers.LayerNormalization()
         self.ffn = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
@@ -201,22 +198,22 @@ class ResidualConvolution(keras.layers.Layer):
             kernel_size: Tamanho do kernel para convolução.
             **kwargs: Argumentos adicionais para a classe Layer.
         """
-    def __init__(self, filters, prev_filters, kernel_size, **kwargs):
+    def __init__(self, filters, prev_filters, kernel_size, strides, **kwargs):
         super(ResidualConvolution, self).__init__(**kwargs)
         self.convs = keras.Sequential([keras.layers.Conv2D(filters, kernel_size=1, padding='same'),
                                        keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same'),
                                        keras.layers.BatchNormalization(),
                                        keras.layers.Activation('gelu'),
                                        keras.layers.Conv2D(filters, kernel_size=1, padding='same'),
-                                       keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same'),
+                                       keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same', strides=strides),
                                        keras.layers.BatchNormalization(),
                                        keras.layers.Activation('gelu')
                                        ])
 
-        if prev_filters == filters:
-            self.skip_connection = lambda x: x
+        if prev_filters != filters or strides >= 2:
+            self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=strides)
         else:
-            self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same')
+            self.skip_connection = lambda x: x
 
     def call(self, x):
         x_skip = self.skip_connection(x)
@@ -227,28 +224,25 @@ class ResidualConvolution(keras.layers.Layer):
 
 class Xadrezia(keras.Model):
     """
-        Modelo principal para análise e predição de movimentos de xadrez.
+        Main model for chess move analysis and prediction.
 
-        Arquitetura:
-            - Blocos convolucionais residuais
-            - Encoders com auto-atenção
-            - Heads para predição de movimento, coluna e linha
+        Architecture:
+            - Residual convolutional blocks
+            - Encoders with self-attention
+            - Heads for move, column, and row prediction
 
-        Métodos:
-            call(x): Processa a entrada e retorna predições concatenadas.
-        """
+        Methods:
+            call(x): Processes the input and returns concatenated predictions.
+"""
     def __init__(self, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(32, kernel_size=8, padding='same', strides=1),
+        self.convolutions = keras.Sequential([keras.layers.Conv2D(512, kernel_size=8, padding='same', strides=1),
                                               keras.layers.BatchNormalization(),
                                               keras.layers.Activation('gelu'),
-                                              ResidualConvolution(64, 32, kernel_size=4),
-                                              #keras.layers.MaxPooling2D(),
-                                              ResidualConvolution(64, 64, kernel_size=4),
-                                              ResidualConvolution(128, 64, kernel_size=2),
+                                              ResidualConvolution(512, 512, kernel_size=4, strides=1)
                                               ])
 
-        self.mha_encoders = keras.Sequential([Encoder(128, 4)]*2)
+        self.mha_encoders = keras.Sequential([Encoder(512, 4, 4, 4)]*2)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -257,8 +251,8 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        #pos_encoding = get_positional_encoding(128, 16)
-        #x = x + pos_encoding
+        pos_encoding = get_positional_encoding(batch_size=16, height=8, width=8, d_model=512)
+        x = x + pos_encoding
         x = self.mha_encoders(x)
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
         col = self.col(self.flatten(x))  # Shape: (batch_size, 9)

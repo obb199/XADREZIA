@@ -1,9 +1,10 @@
 import numpy as np
 
-base = np.zeros(7)
+base = np.zeros(7)  # Base vector representing empty piece
 
-EMPTY = np.copy(base)
+EMPTY = np.copy(base)  # Empty square representation
 
+# White pieces
 WHITE_PAWN = np.copy(base)
 WHITE_PAWN[0] = 1
 WHITE_PAWN[-1] = 1
@@ -28,6 +29,7 @@ WHITE_KING = np.copy(base)
 WHITE_KING[5] = 1
 WHITE_KING[-1] = 1
 
+# Black pieces
 BLACK_PAWN = np.copy(base)
 BLACK_PAWN[0] = 1
 
@@ -46,6 +48,7 @@ BLACK_QUEEN[4] = 1
 BLACK_KING = np.copy(base)
 BLACK_KING[5] = 1
 
+# Dictionaries to convert notation to vector representation
 WHITE_CONVERTION = {'N': WHITE_KNIGHT,
                     'B': WHITE_BISHOP,
                     'R': WHITE_ROOK,
