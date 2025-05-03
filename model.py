@@ -7,57 +7,95 @@ import utils
 
 def get_positional_encoding(model_dimension, batch_size):
     """
-    Compute 2D positional encodings for a grid of given height and width.
+    Generate a 2D positional encoding with shape (batch, height, width, d_model).
 
-    Args:
-        model_dimension: The dimension of the model embeddings (must be even)
-        height: Height of the grid (e.g., 8)
-        width: Width of the grid (e.g., 8)
-        batch_size: Number of samples in the batch
+    For an odd d_model, the function computes sinusoidal encoding for (d_model - 1) channels
+    (split equally between rows & columns) and appends an extra channel based on a combined row-col signal.
+
+    Parameters:
+        batch_size (int): Number of examples in the batch.
+        height (int): Height of the 2D grid.
+        width (int): Width of the 2D grid.
+        d_model (int): Channel dimension of the encoding.
 
     Returns:
-        A numpy array of shape (batch_size, height, width, model_dimension) with positional encodings
+        pos_enc_batch (np.ndarray): A numpy array of shape (batch, height, width, d_model)
+                                    containing the 2D positional encoding.
     """
-    # Validate input
-    if model_dimension % 2 != 0:
-        raise ValueError("model_dimension must be even")
+    # If d_model is odd, work with d_model_even (which is d_model-1) and add one extra channel.
+    if model_dimension % 2 == 0:
+        d_model_even = model_dimension
+        add_extra = False
+    else:
+        d_model_even = model_dimension - 1
+        add_extra = True
 
-    # Initialize output array
-    positional_encodings = np.zeros((batch_size, 8, 8, model_dimension))
+    # We split the encoding channels equally between rows and columns.
+    # d_model_even is assumed to be even.
+    half_dim = d_model_even // 2
 
-    # Generate row and column indices for the grid
-    row_indices = np.arange(8).reshape(1, 8, 1, 1)  # Shape: (1, height, 1, 1)
-    col_indices = np.arange(8).reshape(1, 1, 8, 1)   # Shape: (1, 1, width, 1)
+    # Create position indices for rows and columns.
+    row_indices = np.arange(8)[:, np.newaxis]  # shape: (height, 1)
+    col_indices = np.arange(8)[:, np.newaxis]  # shape: (width, 1)
 
-    # Pre-calculate denominators for all k values
-    k_values = np.arange(model_dimension // 4)  # Half for row, half for col
-    denominators = np.power(10000, 2 * k_values / model_dimension)  # Shape: (model_dimension // 4,)
+    # Precompute frequencies for each channel index.
+    # We use a simple formulation: frequency_j = 1 / 10000^(j/half_dim)
+    j_indices = np.arange(half_dim)
+    freqs = 1 / (10000 ** (j_indices / half_dim))  # shape: (half_dim,)
 
-    # Reshape denominators for broadcasting
-    denominators = denominators.reshape(1, 1, 1, -1)  # Shape: (1, 1, 1, model_dimension // 4)
+    # Initialize empty encodings for rows and columns.
+    pos_row = np.zeros((8, half_dim))
+    pos_col = np.zeros((8, half_dim))
 
-    # Calculate angles for row and column indices
-    row_angle_rates = row_indices / denominators  # Shape: (1, height, 1, model_dimension // 4)
-    col_angle_rates = col_indices / denominators  # Shape: (1, 1, width, model_dimension // 4)
+    # Compute row encoding: for each channel use sin for even indices and cos for odd indices.
+    for j in range(half_dim):
+        # Multiply the row index with the frequency.
+        if j % 2 == 0:
+            pos_row[:, j] = np.sin(row_indices[:, 0] * freqs[j])
+        else:
+            pos_row[:, j] = np.cos(row_indices[:, 0] * freqs[j])
 
-    # Apply sine and cosine to row and column indices
-    positional_encodings[..., 0:model_dimension//4] = np.sin(row_angle_rates)  # Row sin
-    positional_encodings[..., model_dimension//4:model_dimension//2] = np.cos(row_angle_rates)  # Row cos
-    positional_encodings[..., model_dimension//2:3*model_dimension//4] = np.sin(col_angle_rates)  # Col sin
-    positional_encodings[..., 3*model_dimension//4:model_dimension] = np.cos(col_angle_rates)  # Col cos
+    # Compute column encoding similarly.
+    for j in range(half_dim):
+        if j % 2 == 0:
+            pos_col[:, j] = np.sin(col_indices[:, 0] * freqs[j])
+        else:
+            pos_col[:, j] = np.cos(col_indices[:, 0] * freqs[j])
 
-    return positional_encodings
+    # Expand dims so that row encoding is shaped (height, 1, half_dim) and
+    # column encoding is shaped (1, width, half_dim).
+    pos_row_expanded = pos_row[:, np.newaxis, :]  # (height, 1, half_dim)
+    pos_col_expanded = pos_col[np.newaxis, :, :]  # (1, width, half_dim)
+
+    # Broadcast to shape (height, width, half_dim) and then concatenate along the channel dimension.
+    pos_row_broadcast = np.broadcast_to(pos_row_expanded, (8, 8, half_dim))
+    pos_col_broadcast = np.broadcast_to(pos_col_expanded, (8, 8, half_dim))
+    pos_enc = np.concatenate([pos_row_broadcast, pos_col_broadcast], axis=-1)  # shape: (height, width, d_model_even)
+
+    # If the desired d_model is odd, append an extra channel.
+    # For the extra channel, we will use a simple combined positional signal.
+    if add_extra:
+        # Generate a grid of row and column indices.
+        grid_row = np.tile(np.arange(8)[:, np.newaxis], (1, 8))
+        grid_col = np.tile(np.arange(8)[np.newaxis, :], (8, 1))
+        extra_channel = np.sin((grid_row + grid_col) / (8 + 8))
+        extra_channel = extra_channel[..., np.newaxis]  # shape: (height, width, 1)
+        pos_enc = np.concatenate([pos_enc, extra_channel], axis=-1)  # shape: (height, width, d_model)
+
+    # Finally, add the batch dimension by tiling the same positional encoding for all items in the batch.
+    pos_enc_batch = np.broadcast_to(pos_enc, (batch_size, 8, 8, model_dimension))
+    return pos_enc_batch
 
 
 class MultiHeadAttention(keras.layers.Layer):
     """
-        Implementação de atenção multi-head para análise de posições de xadrez.
+    Implementação de atenção multi-head para análise de posições de xadrez.
 
-        Args:
-            d_model: Dimensionalidade do modelo.
-            n_heads: Número de heads de atenção.
-            **kwargs: Argumentos adicionais para a classe Layer.
-        """
+    Args:
+        d_model: Dimensionalidade do modelo.
+        n_heads: Número de heads de atenção.
+        **kwargs: Argumentos adicionais para a classe Layer.
+    """
     def __init__(self, d_model, n_heads, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.d_model = d_model
@@ -69,14 +107,17 @@ class MultiHeadAttention(keras.layers.Layer):
         self.wv = keras.layers.Dense(d_model)
 
         self.final_dense = keras.layers.Dense(d_model, activation='gelu')
-        self.final_reshape = keras.layers.Reshape([-1, 8, 8, d_model])
+        self.final_reshape = keras.layers.Reshape([8, 8, d_model])  # Fixed shape assuming 8x8 grid
 
-    def split_heads(self, x, batch_size):
+    def split_heads(self, x):
         """
-        input shape: batch_size x seq_lenth x d_model
-        intermediate shape: batch_size x seq_length/depth x num_heads x depth
-        output shape: batch_size x num_heads x seq_length/depth x depth
+        Split the last dimension into (n_heads, depth) and transpose.
+
+        Input shape: (batch_size, 8, 8, d_model)
+        Intermediate shape: (batch_size, 64, n_heads, depth)
+        Output shape: (batch_size, n_heads, 64, depth)
         """
+        batch_size = tf.shape(x)[0]
         x = tf.reshape(x, [batch_size, -1, self.n_heads, self.depth])
         x = tf.transpose(x, perm=[0, 2, 1, 3])
         return x
@@ -86,37 +127,36 @@ class MultiHeadAttention(keras.layers.Layer):
         return tf.cast(tf.math.equal(seq, 0), tf.float32) * 1e-9
 
     def call(self, x):
-        # linear combination with inputs
-        q = self.wq(x)
-        k = self.wk(x)
-        v = self.wv(x)
+        # Linear combination with inputs
+        q = self.wq(x)  # Shape: (batch_size, 8, 8, d_model)
+        k = self.wk(x)  # Shape: (batch_size, 8, 8, d_model)
+        v = self.wv(x)  # Shape: (batch_size, 8, 8, d_model)
 
-        # splitting heads for multihead attention
-        batch_size = q.shape[0]
-        q = self.split_heads(q, batch_size)
-        k = self.split_heads(k, batch_size)
-        v = self.split_heads(v, batch_size)
+        # Splitting heads for multi-head attention
+        q = self.split_heads(q)  # Shape: (batch_size, n_heads, 64, depth)
+        k = self.split_heads(k)  # Shape: (batch_size, n_heads, 64, depth)
+        v = self.split_heads(v)  # Shape: (batch_size, n_heads, 64, depth)
 
-        # calculating attention
-        scale = self.d_model ** 0.5
-        qk_product = tf.matmul(q, k, transpose_b=True) / scale
+        # Calculating attention
+        scale = tf.cast(self.d_model, tf.float32) ** 0.5
+        qk_product = tf.matmul(q, k, transpose_b=True) / scale  # Shape: (batch_size, n_heads, 64, 64)
 
         mask = self.create_padding_mask(qk_product)
         qk_product += mask
 
-        qk_product = tf.nn.softmax(qk_product)
+        qk_product = tf.nn.softmax(qk_product)  # Shape: (batch_size, n_heads, 64, 64)
 
-        attention_result = tf.matmul(qk_product, v)
+        attention_result = tf.matmul(qk_product, v)  # Shape: (batch_size, n_heads, 64, depth)
 
-        # return the values for the initial shape before splitting
-        pre_output = tf.transpose(attention_result, perm=[0, 2, 1, 3])
-        pre_output = tf.reshape(pre_output, [batch_size, -1, self.d_model])
-        # linear combination with non linear activation
-        output = self.final_dense(pre_output)
-        output = tf.squeeze(self.final_reshape(output))
+        # Return to the initial shape before splitting
+        pre_output = tf.transpose(attention_result, perm=[0, 2, 1, 3])  # Shape: (batch_size, 64, n_heads, depth)
+        batch_size = tf.shape(pre_output)[0]
+        pre_output = tf.reshape(pre_output, [batch_size, -1, self.d_model])  # Shape: (batch_size, 64, d_model)
 
-        if len(output.shape) == 3:
-            self.final_reshape = tf.expand_dims(self.final_reshape, 0)
+        # Linear combination with non-linear activation
+        output = self.final_dense(pre_output)  # Shape: (batch_size, 64, d_model)
+        output = self.final_reshape(output)  # Shape: (batch_size, 8, 8, d_model)
+
         return output
 
 
@@ -203,13 +243,12 @@ class Xadrezia(keras.Model):
                                               keras.layers.BatchNormalization(),
                                               keras.layers.Activation('gelu'),
                                               ResidualConvolution(64, 32, kernel_size=4),
+                                              #keras.layers.MaxPooling2D(),
+                                              ResidualConvolution(64, 64, kernel_size=4),
                                               ResidualConvolution(128, 64, kernel_size=2),
-                                              ResidualConvolution(128, 128, kernel_size=2),
-                                              ResidualConvolution(256, 128, kernel_size=2),
-                                              ResidualConvolution(256, 256, kernel_size=2),
                                               ])
 
-        self.mha_encoders = keras.Sequential([Encoder(256, 8)]*4)
+        self.mha_encoders = keras.Sequential([Encoder(128, 4)]*2)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -218,25 +257,11 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        pos_encoding = get_positional_encoding(256, 16)
-        x = x + pos_encoding
+        #pos_encoding = get_positional_encoding(128, 16)
+        #x = x + pos_encoding
         x = self.mha_encoders(x)
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
         col = self.col(self.flatten(x))  # Shape: (batch_size, 9)
         row = self.row(self.flatten(x))  # Shape: (batch_size, 9)
         return tf.concat([move, col, row], 1)
 
-
-if __name__ == '__main__':
-    training_data = utils.clean_data(True)
-    training_data = utils.shuffle(training_data, 1000000)
-    length_data = len(training_data)
-
-    Xadrezia = Xadrezia()
-    optimizer = keras.optimizers.AdamW(learning_rate=1e-4)
-    Xadrezia.compile(optimizer=optimizer, loss='categorical_crossentropy')
-    gen_train = data_loader.DataGenerator(training_data[0:int(length_data*0.7)])
-    gen_val = data_loader.DataGenerator(training_data[int(length_data*0.7):int(length_data*0.9)])
-    gen_test = data_loader.DataGenerator(training_data[int(length_data*0.9):])
-    Xadrezia.fit(gen_train, epochs=5, validation_data=gen_val)
-    Xadrezia.save_weights('weights.weights.h5')
