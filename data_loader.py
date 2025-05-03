@@ -56,14 +56,13 @@ class DataGenerator(keras.utils.Sequence):
         Returns:
             Tuple containing (processed input data, labels in one-hot format).
 """
-        sorted_idx = np.random.randint(low=0, high=len(X), size=self.batch_size)
+        sorted_idx = np.random.randint(low=0, high=len(X), size=self.moves_per_game)
 
         final_X, final_y = [], []
 
         for idx in sorted_idx:
-            if X[idx] not in final_X:
-                final_X.append(X[idx])
-                final_y.append(y[idx])
+            final_X.append(X[idx])
+            final_y.append(y[idx])
 
         sparse_final_y = []
         for i, y in enumerate(final_y):
@@ -97,8 +96,9 @@ class DataGenerator(keras.utils.Sequence):
         # Generate data
         X, y = self.__data_generation(game)
         X, y = self.__choice_data(X, y)
+        X, y = np.array(X), np.array(y)
 
-        return np.array(X), np.array(y)
+        return X, y
 
     def on_epoch_end(self):
         """
