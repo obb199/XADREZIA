@@ -103,7 +103,8 @@ class MultiHeadAttention(keras.layers.Layer):
         self.wq = keras.layers.Dense(d_model)
         self.wk = keras.layers.Dense(d_model)
         self.wv = keras.layers.Dense(d_model)
-        self.final_conv = ResidualConvolution(d_model, d_model, 2, 1)
+
+        self.final_dense = keras.layers.Dense(d_model, activation='gelu')
         self.final_reshape = keras.layers.Reshape([height, width, d_model])  # Fixed shape assuming 8x8 grid
 
     def split_heads(self, x):
@@ -151,8 +152,8 @@ class MultiHeadAttention(keras.layers.Layer):
         pre_output = tf.reshape(pre_output, [batch_size, -1, self.d_model])  # Shape: (batch_size, 64, d_model)
 
         # Linear combination with non-linear activation
-        output = self.final_reshape(pre_output)  # Shape: (batch_size, 8, 8, d_model)
-        output = self.final_conv(output)  # Shape: (batch_size, 8, 8, d_model)
+        output = self.final_dense(pre_output)  # Shape: (batch_size, 64, d_model)
+        output = self.final_reshape(output)  # Shape: (batch_size, 8, 8, d_model)
 
         return output
 
@@ -236,13 +237,13 @@ class Xadrezia(keras.Model):
 """
     def __init__(self, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(512, kernel_size=8, padding='same', strides=1),
+        self.convolutions = keras.Sequential([keras.layers.Conv2D(256, kernel_size=8, padding='same', strides=1),
                                               keras.layers.BatchNormalization(),
                                               keras.layers.Activation('gelu'),
-                                              ResidualConvolution(512, 512, kernel_size=4, strides=1)
+                                              ResidualConvolution(512, 256, kernel_size=4, strides=1),
                                               ])
 
-        self.mha_encoders = keras.Sequential([Encoder(512, 4, 4, 4)]*2)
+        self.mha_encoders = keras.Sequential([Encoder(512, 8, 8, 8)]*2)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
