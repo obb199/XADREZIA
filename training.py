@@ -15,5 +15,5 @@ if __name__ == '__main__':
     gen_train = data_loader.DataGenerator(training_data[0:int(length_data * 0.7)], batch_size=1, moves_per_game=16)
     gen_val = data_loader.DataGenerator(training_data[int(length_data * 0.7):int(length_data * 0.9)])
     gen_test = data_loader.DataGenerator(training_data[int(length_data * 0.9):])
-    Xadrezia.fit(gen_train, epochs=8, validation_data=gen_val)
+    Xadrezia.fit(gen_train, epochs=7, validation_data=gen_val)
     Xadrezia.save_weights('weights.weights.h5')

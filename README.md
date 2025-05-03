@@ -1,6 +1,6 @@
 # XADREZIA
 
-### Xadrezia é um projeto experimental para desenvolver uma engine de xadrez baseada exclusivamente em reconhecimento de padrões em jogos dos melhores enxadristas do mundo. Ao contrário de engines tradicionais que utilizam busca em árvore (como Minimax ou Monte Carlo Tree Search ou técnicas baseadas em força bruta), Xadrezia emprega redes neurais para avaliar posições e selecionar movimentos, explorando o potencial do aprendizado de máquina no xadrez. O projeto está em fase inicial e é voltado para pesquisa, experimentação, diversão e curiosidade!
+Xadrezia é um projeto experimental para desenvolver uma engine de xadrez baseada exclusivamente em reconhecimento de padrões em jogos dos melhores enxadristas do mundo. Ao contrário de engines tradicionais que utilizam busca em árvore (como Minimax ou Monte Carlo Tree Search ou técnicas baseadas em força bruta), Xadrezia emprega redes neurais para avaliar posições e selecionar movimentos, explorando o potencial do aprendizado de máquina no xadrez. O projeto está em fase inicial e é voltado para pesquisa, experimentação, diversão e curiosidade!
 
 ## Estrutura do Repositório
 
