@@ -32,8 +32,8 @@ def get_positional_encoding(height, width, d_model):
     half_dim = d_model_even // 2
 
     # Create position indices for rows and columns.
-    row_indices = np.arange(height)[:, np.newaxis]   # shape: (height, 1)
-    col_indices = np.arange(width)[:, np.newaxis]      # shape: (width, 1)
+    row_indices = np.arange(height)[:, np.newaxis]  # shape: (height, 1)
+    col_indices = np.arange(width)[:, np.newaxis]  # shape: (width, 1)
 
     # Precompute frequencies for each channel index.
     # We use a simple formulation: frequency_j = 1 / 10000^(j/half_dim)
@@ -61,8 +61,8 @@ def get_positional_encoding(height, width, d_model):
 
     # Expand dims so that row encoding is shaped (height, 1, half_dim) and
     # column encoding is shaped (1, width, half_dim).
-    pos_row_expanded = pos_row[:, np.newaxis, :]        # (height, 1, half_dim)
-    pos_col_expanded = pos_col[np.newaxis, :, :]          # (1, width, half_dim)
+    pos_row_expanded = pos_row[:, np.newaxis, :]  # (height, 1, half_dim)
+    pos_col_expanded = pos_col[np.newaxis, :, :]  # (1, width, half_dim)
 
     # Broadcast to shape (height, width, half_dim) and then concatenate along the channel dimension.
     pos_row_broadcast = np.broadcast_to(pos_row_expanded, (height, width, half_dim))
@@ -91,6 +91,7 @@ class MultiHeadAttention(keras.layers.Layer):
         n_heads: Number of attention heads.
         **kwargs: Additional arguments for the Layer class.
 """
+
     def __init__(self, d_model, n_heads, height, width, **kwargs):
         super(MultiHeadAttention, self).__init__(**kwargs)
         self.d_model = d_model
@@ -102,6 +103,7 @@ class MultiHeadAttention(keras.layers.Layer):
         self.wv = keras.layers.Dense(d_model)
 
         self.final_dense = keras.layers.Dense(d_model, activation='gelu')
+        # self.final_conv = ResidualConvolution(d_model, d_model, 2, strides=1)
         self.final_reshape = keras.layers.Reshape([height, width, d_model])  # Fixed shape assuming 8x8 grid
 
     def split_heads(self, x):
@@ -139,9 +141,9 @@ class MultiHeadAttention(keras.layers.Layer):
         mask = self.create_padding_mask(qk_product)
         qk_product += mask
 
-        qk_product = tf.nn.softmax(qk_product)  # Shape: (batch_size, n_heads, 64, 64)
+        qk_product = tf.nn.softmax(qk_product)
 
-        attention_result = tf.matmul(qk_product, v)  # Shape: (batch_size, n_heads, 64, depth)
+        attention_result = tf.matmul(qk_product, v)
 
         # Return to the initial shape before splitting
         pre_output = tf.transpose(attention_result, perm=[0, 2, 1, 3])  # Shape: (batch_size, 64, n_heads, depth)
@@ -150,7 +152,8 @@ class MultiHeadAttention(keras.layers.Layer):
 
         # Linear combination with non-linear activation
         output = self.final_dense(pre_output)  # Shape: (batch_size, 64, d_model)
-        output = self.final_reshape(output)  # Shape: (batch_size, 8, 8, d_model)
+        output = self.final_reshape(pre_output)  # Shape: (batch_size, 8, 8, d_model)
+        # output = self.final_conv(output)
 
         return output
 
@@ -164,6 +167,7 @@ class Encoder(keras.layers.Layer):
             num_heads: Number of attention heads.
             **kwargs: Additional arguments for the Layer class.
 """
+
     def __init__(self, d_model, num_heads, height, width, **kwargs):
         super(Encoder, self).__init__(**kwargs)
         self.d_model = d_model
@@ -196,17 +200,14 @@ class ResidualConvolution(keras.layers.Layer):
             kernel_size: Tamanho do kernel para convolução.
             **kwargs: Argumentos adicionais para a classe Layer.
         """
+
     def __init__(self, filters, prev_filters, kernel_size, strides, **kwargs):
         super(ResidualConvolution, self).__init__(**kwargs)
-        self.convs = keras.Sequential([keras.layers.Conv2D(filters, kernel_size=1, padding='same'),
-                                       keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same'),
-                                       keras.layers.BatchNormalization(),
-                                       keras.layers.Activation('gelu'),
-                                       keras.layers.Conv2D(filters, kernel_size=1, padding='same'),
-                                       keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same', strides=strides),
-                                       keras.layers.BatchNormalization(),
-                                       keras.layers.Activation('gelu')
-                                       ])
+        self.convs = keras.Sequential(
+            [keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same', strides=strides),
+             keras.layers.BatchNormalization(),
+             keras.layers.Activation('gelu')
+             ])
 
         if prev_filters != filters or strides >= 2:
             self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=strides)
@@ -232,21 +233,22 @@ class Xadrezia(keras.Model):
         Methods:
             call(x): Processes the input and returns concatenated predictions.
 """
-    def __init__(self, height=8, width=8, d_model=384, **kwargs):
+
+    def __init__(self, height=8, width=8, d_model=256, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.height = height
         self.width = width
         self.d_model = d_model
         self.pos_encoding = get_positional_encoding(height, width, d_model)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(d_model//2, kernel_size=4, padding='same', strides=1),
-                                              keras.layers.Activation('gelu'),
-                                              keras.layers.BatchNormalization(),
-                                              keras.layers.Conv2D(d_model, kernel_size=3, padding='same', strides=1),
-                                              keras.layers.Activation('gelu'),
-                                              keras.layers.BatchNormalization()
-                                              ])
+        self.convolutions = keras.Sequential(
+            [keras.layers.Conv2D(d_model // 2, kernel_size=4, padding='same', strides=1),
+             keras.layers.Activation('gelu'),
+             keras.layers.BatchNormalization(),
+             ResidualConvolution(d_model, d_model // 2, 3, 1)
+             ])
 
-        self.mha_encoders = [Encoder(d_model, 16, 8, 8)]*6
+        self.mha_encoders = keras.Sequential([Encoder(d_model, 16, 8, 8),
+                                              ResidualConvolution(d_model, d_model, 2, strides=1)] * 8)
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -255,16 +257,12 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        #batch_size = x.to_numpy().shape()[0]
-        #batch_pos_encoding = np.broadcast_to(self.pos_encoding, (batch_size, self.height, self.width, self.d_model))
-        x = x + self.pos_encoding*0.1
-        x_prev = tf.identity(x)
-        for mha in self.mha_encoders:
-            x = mha(x) + x_prev*0.1
-            x_prev = tf.identity(x)
+        # batch_size = x.to_numpy().shape()[0]
+        # batch_pos_encoding = np.broadcast_to(self.pos_encoding, (batch_size, self.height, self.width, self.d_model))
+        x = x + self.pos_encoding * 0.1
+        x = self.mha_encoders(x)
 
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
         col = self.col(self.flatten(x))  # Shape: (batch_size, 9)
         row = self.row(self.flatten(x))  # Shape: (batch_size, 9)
         return tf.concat([move, col, row], 1)
-
