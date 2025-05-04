@@ -31,11 +31,11 @@ def clean_data(for_white_generation):
                     move = move.replace('+', '').replace('#', '')
 
                     if move == 'O-O':
-                        col, line = 8, 0
+                        continue
                     elif move == 'O-O-O':
-                        col, line = 0, 8
+                        continue
                     else:
-                        col, line = find_piece(board_state, move, is_white)
+                        find_piece(board_state, move, is_white)
 
                     move = move.replace('x', '').replace('#', '').replace('+', '')
                     if move[0] == move[0].lower():

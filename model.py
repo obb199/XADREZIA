@@ -248,11 +248,28 @@ class Xadrezia(keras.Model):
              ])
 
         self.mha_encoders = keras.Sequential([Encoder(d_model, 16, 8, 8),
-                                              ResidualConvolution(d_model, d_model, 2, strides=1)] * 8)
+                                              ResidualConvolution(d_model, d_model, 2, strides=1)] * 6)
 
-        self.move = keras.layers.Dense(386, activation='softmax')
-        self.col = keras.layers.Dense(9, activation='softmax')
-        self.row = keras.layers.Dense(9, activation='softmax')
+        self.maxpool = keras.layers.GlobalAvgPool2D()
+
+        self.move = keras.Sequential([keras.layers.Dense(1024, activation='gelu'),
+                                      keras.layers.BatchNormalization(),
+                                      keras.layers.Dense(1024, activation='gelu'),
+                                      keras.layers.BatchNormalization(),
+                                      keras.layers.Dense(386, activation='softmax')])
+
+        self.col = keras.Sequential([keras.layers.Dense(1024, activation='softmax'),
+                                     keras.layers.BatchNormalization(),
+                                     keras.layers.Dense(1024, activation='gelu'),
+                                     keras.layers.BatchNormalization(),
+                                     keras.layers.Dense(9, activation='softmax')])
+
+        self.row = keras.Sequential([keras.layers.Dense(1024, activation='softmax'),
+                                     keras.layers.BatchNormalization(),
+                                     keras.layers.Dense(1024, activation='gelu'),
+                                     keras.layers.BatchNormalization(),
+                                     keras.layers.Dense(9, activation='softmax')])
+
         self.flatten = keras.layers.Flatten()
 
     def call(self, x):
@@ -261,7 +278,7 @@ class Xadrezia(keras.Model):
         # batch_pos_encoding = np.broadcast_to(self.pos_encoding, (batch_size, self.height, self.width, self.d_model))
         x = x + self.pos_encoding * 0.1
         x = self.mha_encoders(x)
-
+        x = self.maxpool(x)
         move = self.move(self.flatten(x))  # Shape: (batch_size, 386)
         col = self.col(self.flatten(x))  # Shape: (batch_size, 9)
         row = self.row(self.flatten(x))  # Shape: (batch_size, 9)
