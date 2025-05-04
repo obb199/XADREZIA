@@ -132,24 +132,23 @@ class DataGenerator(keras.utils.Sequence):
                 boardgame = transposition(boardgame, move, is_white)
 
                 if self.for_white_generation == is_white:
-                    move = move.replace('+', '').replace('#', '')
+                    move = move.replace('+', '').replace('#', '').replace('x', '').replace('=', '')
 
                     if move == 'O-O':
-                        col, line = 8, 0
+                        pred_move = 'O-O'
                     elif move == 'O-O-O':
-                        col, line = 0, 8
+                        pred_move = 'O-O' == 'O-O-O'
                     else:
                         col, line = find_piece(board_state, move, is_white)
+                        pred_move = str(col)+str(line)
 
-                    move = move.replace('x', '').replace('#', '').replace('+', '')
-                    if move[0] == move[0].lower():
-                        move = move[-2:]
-                    elif move == 4:
-                        move = move[0] + move[2:]
+                        pred_move = pred_move + move[-2:]
 
-                    if move in VALID_MOVES:
+                    if pred_move in VALID_MOVES:
                         X.append(board_state)
-                        y.append([MOVE_TO_IDX[move], col, line])
+                        sparse_res = np.zeros(4098)
+                        sparse_res[MOVE_TO_IDX[pred_move]] = 1
+                        y.append(sparse_res)
 
             except Exception as e:
                 return X, y

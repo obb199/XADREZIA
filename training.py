@@ -16,7 +16,7 @@ if __name__ == '__main__':
     #Xadrezia.load_weights('weights.weights.h5')
     optimizer = keras.optimizers.Adam(learning_rate=1e-4)
     Xadrezia.compile(optimizer=optimizer, loss='categorical_crossentropy')
-    Xadrezia.fit(gen_train, epochs=4, validation_data=gen_val)
+    Xadrezia.fit(gen_train, epochs=5, validation_data=gen_val)
     Xadrezia.save_weights('weights.weights.h5')
 
 
