@@ -232,18 +232,21 @@ class Xadrezia(keras.Model):
         Methods:
             call(x): Processes the input and returns concatenated predictions.
 """
-    def __init__(self, height=8, width=8, d_model=256, **kwargs):
+    def __init__(self, height=8, width=8, d_model=384, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.height = height
         self.width = width
         self.d_model = d_model
         self.pos_encoding = get_positional_encoding(height, width, d_model)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(d_model, kernel_size=4, padding='same', strides=1),
+        self.convolutions = keras.Sequential([keras.layers.Conv2D(d_model//2, kernel_size=4, padding='same', strides=1),
+                                              keras.layers.Activation('gelu'),
+                                              keras.layers.BatchNormalization(),
+                                              keras.layers.Conv2D(d_model, kernel_size=3, padding='same', strides=1),
                                               keras.layers.Activation('gelu'),
                                               keras.layers.BatchNormalization()
                                               ])
 
-        self.mha_encoders = [Encoder(d_model, 8, 8, 8)]*6
+        self.mha_encoders = [Encoder(d_model, 16, 8, 8)]*6
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
