@@ -3,7 +3,7 @@ import keras
 import numpy as np
 
 
-def get_positional_encoding(batch_size, height, width, d_model):
+def get_positional_encoding(height, width, d_model):
     """
     Generate a 2D positional encoding with shape (batch, height, width, d_model).
 
@@ -11,13 +11,12 @@ def get_positional_encoding(batch_size, height, width, d_model):
     (split equally between rows & columns) and appends an extra channel based on a combined row-col signal.
 
     Parameters:
-        batch_size (int): Number of examples in the batch.
         height (int): Height of the 2D grid.
         width (int): Width of the 2D grid.
         d_model (int): Channel dimension of the encoding.
 
     Returns:
-        pos_enc_batch (np.ndarray): A numpy array of shape (batch, height, width, d_model)
+        pos_enc_batch (np.ndarray): A numpy array of shape (height, width, d_model)
                                     containing the 2D positional encoding.
     """
     # If d_model is odd, work with d_model_even (which is d_model-1) and add one extra channel.
@@ -80,9 +79,7 @@ def get_positional_encoding(batch_size, height, width, d_model):
         extra_channel = extra_channel[..., np.newaxis]  # shape: (height, width, 1)
         pos_enc = np.concatenate([pos_enc, extra_channel], axis=-1)  # shape: (height, width, d_model)
 
-    # Finally, add the batch dimension by tiling the same positional encoding for all items in the batch.
-    pos_enc_batch = np.broadcast_to(pos_enc, (batch_size, height, width, d_model))
-    return pos_enc_batch
+    return pos_enc
 
 
 class MultiHeadAttention(keras.layers.Layer):
@@ -235,14 +232,18 @@ class Xadrezia(keras.Model):
         Methods:
             call(x): Processes the input and returns concatenated predictions.
 """
-    def __init__(self, **kwargs):
+    def __init__(self, height=8, width=8, d_model=256, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
-        self.convolutions = keras.Sequential([keras.layers.Conv2D(256, kernel_size=4, padding='same', strides=1),
+        self.height = height
+        self.width = width
+        self.d_model = d_model
+        self.pos_encoding = get_positional_encoding(height, width, d_model)
+        self.convolutions = keras.Sequential([keras.layers.Conv2D(d_model, kernel_size=4, padding='same', strides=1),
                                               keras.layers.Activation('gelu'),
                                               keras.layers.BatchNormalization()
                                               ])
 
-        self.mha_encoders = [Encoder(256, 8, 8, 8)]*6
+        self.mha_encoders = [Encoder(d_model, 8, 8, 8)]*6
 
         self.move = keras.layers.Dense(386, activation='softmax')
         self.col = keras.layers.Dense(9, activation='softmax')
@@ -251,8 +252,9 @@ class Xadrezia(keras.Model):
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        pos_encoding = get_positional_encoding(batch_size=16, height=8, width=8, d_model=256)
-        x = x + pos_encoding*0.1
+        #batch_size = x.to_numpy().shape()[0]
+        #batch_pos_encoding = np.broadcast_to(self.pos_encoding, (batch_size, self.height, self.width, self.d_model))
+        x = x + self.pos_encoding*0.1
         x_prev = tf.identity(x)
         for mha in self.mha_encoders:
             x = mha(x) + x_prev*0.1
