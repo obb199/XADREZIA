@@ -6,7 +6,7 @@ from pieces import (
 from pieces import NOTE_CONVERTION, WHITE_CONVERTION, BLACK_CONVERTION
 
 
-def generate_uniques_matches(input_path):
+def generate_uniques_matches(input_path, only_white=True, only_black=False):
     """
         Processa um arquivo de partidas de xadrez e extrai partidas individuais.
 
@@ -26,9 +26,20 @@ def generate_uniques_matches(input_path):
         data = ''
         for clean_data in cleaned_data:
             data += clean_data + ' '
-            if '1-0' in data or '0-1' in data or '1/2-1/2' in data:
-                single_matches.append(data.replace('  1-0', '').replace('  0-1', '').replace('\n', '').replace('1/2-1/2', ''))
-                data = ''
+            if only_white:
+                if '1-0' in data:
+                    single_matches.append(data.replace('  1-0', '').replace('  0-1', '').replace('\n', '').replace('1/2-1/2', ''))
+                    data = ''
+            elif only_black:
+                if '0-1' in data:
+                    single_matches.append(data.replace('  1-0', '').replace('  0-1', '').replace('\n', '').replace('1/2-1/2', ''))
+                    data = ''
+            else:
+                if '1-0' in data or '0-1' in data or '1/2-1/2' in data:
+                    single_matches.append(
+                        data.replace('  1-0', '').replace('  0-1', '').replace('\n', '').replace('1/2-1/2', ''))
+                    data = ''
+
     return single_matches
 
 
