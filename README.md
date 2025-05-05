@@ -8,13 +8,13 @@ O repositório contém scripts em Python que implementam os componentes principa
 
 **data_loader.py:** Carrega e pré-processa dados de treinamento, convertendo posições de xadrez em tensores 8x8x7 que representam o tabuleiro para alimentar a rede neural.
 
-**move_dict.py:** Define um dicionário de mapeamento para movimentos de xadrez, convertendo notações (e.g., "e2e4") em índices para o vetor de saída da rede neural.
+**move_dict.py:** Define dicionários de mapeamento para movimentos de xadrez, convertendo notações em índices para o vetor de saída da rede neural.
 
-**generate_training_data.py:** Gera dados de treinamento a partir de partidas de xadrez ou autojogo, criando pares de entrada-saída (tensores de tabuleiro, vetores de movimento).
+**generate_training_data.py:** Gera dados de treinamento a partir de partidas de xadrez, criando pares de entrada-saída (tensores de tabuleiro e vetores de movimento).
 
-**matches:** Contém exemplos de partidas ou scripts para simular jogos, usados para testar a engine ou gerar dados adicionais.
+**matches:** Contém scripts para simular jogos, usados para testar a engine ou gerar dados adicionais.
 
-**pieces.py:** Define as peças de xadrez e suas propriedades (e.g., movimentos válidos, tipos), servindo como base para a representação do tabuleiro.
+**pieces.py:** Define as peças de xadrez e suas propriedades (ex: movimentos válidos, tipos), servindo como base para a representação do tabuleiro.
 
 **table.py:** Implementa a representação do tabuleiro de xadrez, incluindo métodos para gerar o tensor 8x8x7 com informações sobre todas as peças.
 

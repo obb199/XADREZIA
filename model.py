@@ -15,18 +15,14 @@ def get_positional_encoding(height, width, d_model):
     Returns:
         Tensor of shape (height, width, d_model)
     """
-    if d_model % 2 == 0:
-        d_model_even = d_model
-        add_extra = False
-    else:
-        d_model_even = d_model - 1
-        add_extra = True
+    if d_model % 2 != 0:
+        raise "d_model parameter is not divisble by two."
 
-    half_dim = d_model_even // 2
+    half_dim = d_model // 2
 
     # Generate frequencies using original Transformer's formula
     j = np.arange(half_dim)
-    freqs = 1 / (10000 ** (2 * j / d_model_even))
+    freqs = 1 / (10000 ** (2 * j / d_model))
 
     # Row encoding (vectorized)
     row_indices = np.arange(height)[:, np.newaxis]  # (height, 1)
@@ -46,18 +42,9 @@ def get_positional_encoding(height, width, d_model):
     pos_row = pos_row[:, np.newaxis, :]  # (height, 1, half_dim)
     pos_col = pos_col[np.newaxis, :, :]  # (1, width, half_dim)
 
-    pos_enc = np.zeros((height, width, d_model_even))
+    pos_enc = np.zeros((height, width, d_model))
     pos_enc[..., :half_dim] = pos_row + pos_col  # Combine row/col features
     pos_enc[..., half_dim:] = pos_row * pos_col  # Add multiplicative interactions
-
-    # Handle odd dimensionality
-    if add_extra:
-        # Use geometric mean frequency for the extra channel
-        geom_freq = 1 / (10000 ** ((2 * half_dim) / (d_model_even + 1)))
-        row_geom = np.sin(row_indices * geom_freq)
-        col_geom = np.cos(col_indices * geom_freq)
-        extra_channel = row_geom[:, np.newaxis] * col_geom[np.newaxis, :]
-        pos_enc = np.concatenate([pos_enc, extra_channel[:, :, np.newaxis]], axis=-1)
 
     return tf.constant(pos_enc, dtype=tf.float32)
 
