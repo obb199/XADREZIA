@@ -16,7 +16,7 @@ def get_positional_encoding(height, width, d_model):
         Tensor of shape (height, width, d_model)
     """
     if d_model % 2 != 0:
-        raise "d_model parameter is not divisble by two."
+        raise "d_model parameter is not divisible by two."
 
     half_dim = d_model // 2
 
