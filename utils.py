@@ -6,6 +6,9 @@ import numpy as np
 
 
 def clean_data(for_white_generation):
+    cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
+                       4: 'e', 5: 'f', 6: 'g', 7: 'h'}
+
     FILEPATH = '/home/user/PycharmProjects/chess_engine/matches/'
     matches = [FILEPATH + path for path in os.listdir(FILEPATH)]
     processed_matches = []
@@ -28,22 +31,18 @@ def clean_data(for_white_generation):
                 boardgame = transposition(boardgame, move, is_white)
 
                 if for_white_generation == is_white:
-                    move = move.replace('+', '').replace('#', '')
+                    move = move.replace('+', '').replace('#', '').replace('x', '')
 
                     if move == 'O-O':
                         continue
                     elif move == 'O-O-O':
                         continue
                     else:
-                        find_piece(board_state, move, is_white)
+                        col, line = find_piece(board_state, move, is_white)
+                        pred_move = cols_convertion[col] + str(line)
+                        pred_move = pred_move + move[-2:]
 
-                    move = move.replace('x', '').replace('#', '').replace('+', '')
-                    if move[0] == move[0].lower():
-                        move = move[-2:]
-                    elif move == 4:
-                        move = move[0] + move[2:]
-
-                    if move in VALID_MOVES:
+                    if pred_move in VALID_MOVES:
                         correct_games.append(sequence_of_moves(g))
                         break
 

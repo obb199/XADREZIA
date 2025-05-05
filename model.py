@@ -209,50 +209,29 @@ class Xadrezia(keras.Model):
             call(x): Processes the input and returns concatenated predictions.
 """
 
-    def __init__(self, height=8, width=8, d_model=128, **kwargs):
+    def __init__(self, height=8, width=8, d_model=256, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.d_model = d_model
         self.pos_encoding = get_positional_encoding(height, width, d_model)
         self.convolutions = keras.Sequential(
-            [keras.layers.Conv2D(64, kernel_size=4, padding='same', strides=1),
+            [keras.layers.Conv2D(128, kernel_size=4, padding='same', strides=1),
              keras.layers.Activation('gelu'),
              ])
 
-        self.pre_mha_conv = ResidualConvolution(d_model, 64, kernel_size=2, strides=1)
-        self.mha_encoders = keras.Sequential([Encoder(d_model, 8, 8, 8)] * 2)
-
-        """self.convs = keras.Sequential([ResidualConvolution(128, 64, 3, strides=1),
-                                       keras.layers.BatchNormalization(),
-                                       ResidualConvolution(256, 128, 2, strides=1),
-                                       keras.layers.BatchNormalization(),
-                                       ResidualConvolution(512, 256, 2, strides=1),
-                                       keras.layers.BatchNormalization(),
-                                       ResidualConvolution(1024, 512, 2, strides=1)
-                                       ])
-
-        self.att_dense = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
-                                      keras.layers.LayerNormalization(),
-                                      keras.layers.Dropout(0.2),
-                                      keras.layers.Dense(386, activation='softmax')])
-
-        self.conv_dense = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
-                                           keras.layers.LayerNormalization(),
-                                           keras.layers.Dropout(0.2),
-                                           keras.layers.Dense(386, activation='softmax')])"""
+        self.pre_mha_conv = ResidualConvolution(d_model, 128, kernel_size=2, strides=1)
+        self.mha_encoders = keras.Sequential([Encoder(d_model, 8, 8, 8)] * 8)
 
         self.move = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
                                       keras.layers.LayerNormalization(),
                                       keras.layers.Dropout(0.25),
                                       keras.layers.Dense(4098, activation='softmax')])
 
-        self.maxpool = keras.layers.GlobalAvgPool2D()
-        #self.flat = keras.layers.Flatten()
+        #self.maxpool = keras.layers.GlobalAvgPool2D()
+        self.flatt = keras.layers.Flatten()
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        #x_conv = self.convs(x)
-        x = self.pre_mha_conv(x) + self.pos_encoding
+        x = self.pre_mha_conv(x) + self.pos_encoding * 0.25
         x = self.mha_encoders(x)
-        #x = tf.concat([self.att_dense(self.maxpool(x_att)), self.conv_dense(self.maxpool(x_conv))], axis=-1)
-        move_probabilities = self.move(self.maxpool(x))  # Shape: (batch_size, 4098)
+        move_probabilities = self.move(self.flatt(x))  # Shape: (batch_size, 4098)
         return move_probabilities

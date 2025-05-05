@@ -62,20 +62,11 @@ class DataGenerator(keras.utils.Sequence):
 
         for idx in sorted_idx:
             final_X.append(X[idx])
-            final_y.append(y[idx])
+            sparse_res = np.zeros(4098)
+            sparse_res[MOVE_TO_IDX[y[idx]]] = 1
+            final_y.append(sparse_res)
 
-        sparse_final_y = []
-        for i, y in enumerate(final_y):
-            move = [0 for _ in range(386)]
-            move[y[0]] = 1
-            col = [0 for _ in range(9)]
-            col[y[1]] = 1
-            line = [0 for _ in range(9)]
-            line[y[2]] = 1
-
-            sparse_final_y.append(tf.concat([move, col, line], axis=0))
-
-        return final_X, sparse_final_y
+        return final_X, final_y
 
     def __getitem__(self, index):
         """
@@ -119,7 +110,8 @@ class DataGenerator(keras.utils.Sequence):
     Returns:
         A tuple containing (list of board states, list of corresponding moves).
         """
-
+        cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
+                           4: 'e', 5: 'f', 6: 'g', 7: 'h'}
         X = []
         y = []
         boardgame = generate_start_table()
@@ -140,15 +132,13 @@ class DataGenerator(keras.utils.Sequence):
                         pred_move = 'O-O' == 'O-O-O'
                     else:
                         col, line = find_piece(board_state, move, is_white)
-                        pred_move = str(col)+str(line)
+                        pred_move = cols_convertion[col]+str(line)
 
                         pred_move = pred_move + move[-2:]
 
                     if pred_move in VALID_MOVES:
                         X.append(board_state)
-                        sparse_res = np.zeros(4098)
-                        sparse_res[MOVE_TO_IDX[pred_move]] = 1
-                        y.append(sparse_res)
+                        y.append(pred_move)
 
             except Exception as e:
                 return X, y
