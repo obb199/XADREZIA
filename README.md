@@ -87,16 +87,16 @@ Usa atenção multi-cabeça (multi-head attention) para priorizar informações 
 A saída do Transformer é processada por camadas densas para produzir o vetor de probabilidades, que é decodificando em um lance.
 
             ┌────────────────────────────┐
-            │        Input (8x8x7)       │
+            │        Input (8x8x7)       │◄── Board representation
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
             │   Convolutional Stack      │
             │----------------------------│◄── Feature extraction
-            │   Conv2D + BN + GELU       │
-            │   SE-ResidualConv x 6      │
-            │   (progressively deepens)  │
+            │ - Conv2D + BN + GELU       │
+            │ - SE-ResidualConv x 6      │
+            │  (progressively deepens)   │
             └────────────┬───────────────┘
                          │
                          ▼
