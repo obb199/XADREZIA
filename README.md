@@ -1,3 +1,5 @@
+<img src="https://github.com/user-attachments/assets/cbd122da-121b-4a79-96dc-478cd54241bb" alt="Logo" width="1024" heigth="256">
+
 # Xadrezia chess engine
 
 Xadrezia é um projeto experimental para desenvolver uma engine de xadrez baseada exclusivamente em reconhecimento de padrões em jogos dos melhores enxadristas do mundo. Ao contrário de engines tradicionais que utilizam busca em árvore (como Minimax ou Monte Carlo Tree Search ou técnicas baseadas em força bruta), Xadrezia emprega redes neurais para avaliar posições e selecionar movimentos, explorando o potencial do aprendizado de máquina no xadrez. O projeto está em fase inicial e é voltado para pesquisa, experimentação, diversão e curiosidade!
@@ -48,9 +50,9 @@ Cada elemento do tensor indica a presença (ou ausência) de uma peça em uma ca
 
 **O output da rede é um vetor de probabilidades que codifica:**
 
-O movimento selecionado - movimento específico, coluna de origem e linha de origem (ex: "c5", "De2", "Bg4").
+O movimento selecionado - coluna e linha de onde está a peça e coluna e linha para onde vai (ex: "e2e3", "d1f4", "g6h7").
 
-O vetor contém probabilidades para todos os movimentos possíveis, mapeados via move_dict.py. Por exemplo, o índice do vetor pode corresponder a um movimento específico, como "mover o peão de e2 para e4".
+O vetor contém probabilidades para todos os movimentos possíveis, mapeados via move_dict.py.
 
 Durante a inferência, o movimento válido de maior probabilidade é selecionado.
 
@@ -62,7 +64,7 @@ A rede neural combina algumas técnicas comuns no aprendizado profundo para proc
 
 Aplica uma camada convolucional 2D ao tensor 8x8x7 para extrair características espaciais do tabuleiro (ex: padrões de peças, controle de casas).
 
-Usa filtros (8x8, 4x4 e 2x2) para capturar relações locais entre casas adjacentes.
+Usa filtros (4x4 e 2x2) para capturar relações locais entre casas adjacentes.
 
 
 ### Convoluções Residuais 2D:
@@ -82,44 +84,6 @@ O Transformer modela relações de longo alcance entre casas e peças, capturand
 
 Usa atenção multi-cabeça (multi-head attention) para priorizar informações relevantes.
 
-A saída do Transformer é processada por uma camada densa para produzir o vetor de probabilidades, que é decodificando em um lance.
-
-            ┌────────────────────────────┐
-            │        Input (8x8x7)       │
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │   Convolutional Stack      │
-            │----------------------------│◄── Feature extraction
-            │   Conv2D + BN + GELU       │
-            │   SE-ResidualConv x 6      │
-            │   (progressively deepens)  │
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │Multi-Head Specialists [xN]:│ ◄── 𝙥𝙖𝙧𝙖𝙡𝙡𝙚𝙡 branches
-            │----------------------------│
-            │ - SE-ResidualConv (d_model)│
-            │ - PosEnc fusion            │
-            │ - Transformer Encoders x6  │
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │     Concatenate Features   │ ◄── Combines all specialists
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │          Flatten           │
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │       Dense (4098 units)   │ ◄── Output: move probabilities
-            │       Activation: softmax  │
-            └────────────────────────────┘
+A saída do Transformer é processada por camadas densas para produzir o vetor de probabilidades, que é decodificando em um lance.
 
 ![engine vs human](https://sdmntprwestus.oaiusercontent.com/files/00000000-f1f8-6230-98b5-085b88fc7147/raw?se=2025-05-02T22%3A22%3A50Z&sp=r&sv=2024-08-04&sr=b&scid=b77e90ee-bb50-5c51-bf70-d52d9bb7c754&skoid=51916beb-8d6a-49b8-8b29-ca48ed86557e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-05-02T20%3A37%3A35Z&ske=2025-05-03T20%3A37%3A35Z&sks=b&skv=2024-08-04&sig=sMeg9UmUBNngent2CRI/Z7HXn5yJaViJjZr%2B85OW5BM%3D)
