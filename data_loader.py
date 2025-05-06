@@ -136,7 +136,7 @@ class DataGenerator(keras.utils.Sequence):
 
                         pred_move = pred_move + move[-2:]
 
-                    if pred_move in VALID_MOVES:
+                    if pred_move in VALID_MOVES and board_state not in X:
                         X.append(board_state)
                         y.append(pred_move)
 

@@ -7,8 +7,8 @@ import numpy as np
 if __name__ == '__main__':
     data = utils.clean_data(True)
     data = utils.shuffle(data, 1000000)
-    gen_train = data_loader.DataGenerator(data[:int(len(data)*0.25)], moves_per_game=2)
-    gen_val = data_loader.DataGenerator(data[int(len(data)*0.7):int(len(data)*0.8)], moves_per_game=2)
+    gen_train = data_loader.DataGenerator(data[:int(len(data)*0.7)], moves_per_game=2)
+    gen_val = data_loader.DataGenerator(data[int(len(data)*0.7):int(len(data)*0.9)], moves_per_game=1)
     #gen_test = data_loader.DataGenerator(data[int(len(data)*0.9):], moves_per_game=2)
     Xadrezia = model.Xadrezia()
     Xadrezia.predict(np.random.randn(1, 8, 8, 7), verbose=0)

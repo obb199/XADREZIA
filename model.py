@@ -171,6 +171,12 @@ class ResidualConvolution(keras.layers.Layer):
              keras.layers.Activation('gelu')
              ])
 
+        self.se_block = keras.Sequential([keras.layers.Dense(filters, activation='gelu'),
+                                          keras.layers.BatchNormalization(),
+                                          keras.layers.Dense(filters//4, activation='gelu'),
+                                          keras.layers.BatchNormalization(),
+                                          keras.layers.Dense(filters, activation='sigmoid')])
+
         if prev_filters != filters or strides >= 2:
             self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=strides)
         else:
@@ -180,7 +186,7 @@ class ResidualConvolution(keras.layers.Layer):
         x_skip = self.skip_connection(x)
         x = self.convs(x)
 
-        return x + x_skip
+        return self.se_block(x)*x + x_skip
 
 
 class Xadrezia(keras.Model):
@@ -196,30 +202,81 @@ class Xadrezia(keras.Model):
             call(x): Processes the input and returns concatenated predictions.
 """
 
-    def __init__(self, height=8, width=8, d_model=128, **kwargs):
+    def __init__(self, height=8, width=8, d_model=256, n_specialists=4, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.d_model = d_model
         self.pos_encoding = get_positional_encoding(height, width, d_model)
         self.convolutions = keras.Sequential(
-                                [keras.layers.Conv2D(32, kernel_size=8, padding='same', strides=1),
-                                 keras.layers.BatchNormalization(),
-                                 keras.layers.Activation('gelu'),
-                                 ResidualConvolution(64, 32, 2, 1),
-                                 ResidualConvolution(128, 64, 2, 1)
-                                 ])
+            [keras.layers.Conv2D(32, kernel_size=8, padding='same', strides=1),
+             keras.layers.BatchNormalization(),
+             keras.layers.Activation('gelu'),
+             ResidualConvolution(64, 32, 4, 1),
+             ResidualConvolution(128, 64, 3, 1),
+             ResidualConvolution(256, 128, 2, 1),
+             ResidualConvolution(512, 256, 2, 1),
+             ResidualConvolution(1024, 512, 2, 1),
+             ResidualConvolution(2048, 1024, 2, 1),
+             ])
 
-        self.mha_encoders = keras.Sequential([Encoder(d_model, 8, 8, 8)] * 8)
+        self.mha_encoders = [keras.Sequential([ResidualConvolution(d_model, 2048, 2, 1),
+                                               ResidualConvolution(d_model, d_model, 2, 1),
+                                               keras.layers.Lambda(lambda x: x + self.pos_encoding*0.1)] +
+                                              [Encoder(d_model, 8, 8, 8)] * 8)]*n_specialists
 
-        self.move = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
-                                      keras.layers.LayerNormalization(),
-                                      keras.layers.Dropout(0.25),
+        self.move = keras.Sequential([keras.layers.BatchNormalization(),
                                       keras.layers.Dense(4098, activation='softmax')])
 
-        self.flatt = keras.layers.Flatten()
+        self.global_avg_pool = keras.layers.Flatten()
 
     def call(self, x):
         x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        x = x + self.pos_encoding
-        x = self.mha_encoders(x)
-        move_probabilities = self.move(self.flatt(x))  # Shape: (batch_size, 4098)
+        #x = x + self.pos_encoding
+
+        encoders_output = [specialist(x) for specialist in self.mha_encoders]
+
+        x = tf.concat(encoders_output, axis=-1)
+        x = self.global_avg_pool(x)
+
+        move_probabilities = self.move(x)  # Shape: (batch_size, 4098)
         return move_probabilities
+
+
+"""
+            ┌────────────────────────────┐
+            │        Input (8x8x7)       │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │   Convolutional Stack      │
+            │----------------------------│◄── Feature extraction
+            │   Conv2D + BN + GELU       │
+            │   SE-ResidualConv x 6      │
+            │   (progressively deepens)  │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │Multi-Head Specialists [xN]:│ ◄── 𝙥𝙖𝙧𝙖𝙡𝙡𝙚𝙡 branches
+            │----------------------------│
+            │ - SE-ResidualConv (d_model)│
+            │ - PosEnc fusion            │
+            │ - Transformer Encoders x6  │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │     Concatenate Features   │ ◄── Combines all specialists
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │          Flatten           │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │       Dense (4098 units)   │ ◄── Output: move probabilities
+            │       Activation: softmax  │
+            └────────────────────────────┘
+"""
