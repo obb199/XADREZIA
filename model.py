@@ -46,7 +46,7 @@ def get_positional_encoding(height, width, d_model):
     pos_enc[..., :half_dim] = pos_row + pos_col  # Combine row/col features
     pos_enc[..., half_dim:] = pos_row * pos_col  # Add multiplicative interactions
 
-    return tf.constant(pos_enc, dtype=tf.float32)
+    return tf.constant(pos_enc * 0.1, dtype=tf.float32)
 
 
 class MultiHeadAttention(keras.layers.Layer):
@@ -116,7 +116,6 @@ class MultiHeadAttention(keras.layers.Layer):
         # Linear combination with non-linear activation
         output = self.final_dense(pre_output)  # Shape: (batch_size, height * width, d_model)
         output = self.final_reshape(output)  # Shape: (batch_size, height, width, d_model)
-        # output = self.final_conv(output)
 
         return output
 
@@ -138,9 +137,13 @@ class Encoder(keras.layers.Layer):
         self.mha = MultiHeadAttention(d_model, num_heads, height, width)
         self.norm_1 = keras.layers.LayerNormalization()
         self.norm_2 = keras.layers.LayerNormalization()
-        self.ffn = keras.Sequential([keras.layers.Dense(d_model, activation='gelu'),
+        self.ffn = keras.Sequential([keras.layers.Dense(d_model*4, activation='gelu'),
                                      keras.layers.LayerNormalization(),
-                                     keras.layers.Dropout(0.25)])
+                                     keras.layers.Dropout(0.25),
+                                     keras.layers.Dense(d_model, activation='gelu'),
+                                     keras.layers.LayerNormalization(),
+                                     keras.layers.Dropout(0.25)
+                                     ])
 
     def call(self, x):
         auto_attention_result = self.mha.call(x)
@@ -163,30 +166,33 @@ class ResidualConvolution(keras.layers.Layer):
             **kwargs: Argumentos adicionais para a classe Layer.
         """
 
-    def __init__(self, filters, prev_filters, kernel_size, strides, **kwargs):
+    def __init__(self, filters, kernel_size, strides, **kwargs):
         super(ResidualConvolution, self).__init__(**kwargs)
         self.convs = keras.Sequential(
-            [keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same', strides=strides),
+            [keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=1),
+             keras.layers.Conv2D(filters, kernel_size=kernel_size, padding='same', strides=strides),
+             keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=1),
              keras.layers.BatchNormalization(),
              keras.layers.Activation('gelu')
              ])
 
-        self.se_block = keras.Sequential([keras.layers.Dense(filters, activation='gelu'),
+        self.se_block = keras.Sequential([keras.layers.GlobalAvgPool2D(),
+                                          keras.layers.Dense(filters, activation='gelu'),
                                           keras.layers.BatchNormalization(),
-                                          keras.layers.Dense(filters//4, activation='gelu'),
+                                          keras.layers.Dense(filters // 4, activation='gelu'),
                                           keras.layers.BatchNormalization(),
-                                          keras.layers.Dense(filters, activation='sigmoid')])
+                                          keras.layers.Dense(filters, activation='sigmoid'),
+                                          keras.layers.Reshape([1, 1, filters])])
 
-        if prev_filters != filters or strides >= 2:
-            self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=strides)
-        else:
-            self.skip_connection = lambda x: x
+        self.skip_connection = keras.layers.Conv2D(filters, kernel_size=1, padding='same', strides=strides)
+
+        self.sum_activation = keras.layers.Activation('gelu')
 
     def call(self, x):
         x_skip = self.skip_connection(x)
         x = self.convs(x)
-
-        return self.se_block(x)*x + x_skip
+        se_res = self.se_block(x)
+        return self.sum_activation(x * se_res + x_skip)
 
 
 class Xadrezia(keras.Model):
@@ -194,7 +200,7 @@ class Xadrezia(keras.Model):
         Main model for chess move analysis and prediction.
 
         Architecture:
-            - Residual convolutional blocks
+            - Squeeze-and-Excitation Residual convolutional blocks
             - Encoders with self-attention
             - Heads for move, column, and row prediction
 
@@ -202,40 +208,50 @@ class Xadrezia(keras.Model):
             call(x): Processes the input and returns concatenated predictions.
 """
 
-    def __init__(self, height=8, width=8, d_model=256, n_specialists=4, **kwargs):
+    def __init__(self, height=8, width=8, d_model=256, n_specialists=8, n_encoders=4, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.d_model = d_model
         self.pos_encoding = get_positional_encoding(height, width, d_model)
         self.convolutions = keras.Sequential(
-            [keras.layers.Conv2D(32, kernel_size=8, padding='same', strides=1),
+            [keras.layers.Conv2D(32, kernel_size=4, padding='same', strides=1),
              keras.layers.BatchNormalization(),
              keras.layers.Activation('gelu'),
-             ResidualConvolution(64, 32, 4, 1),
-             ResidualConvolution(128, 64, 3, 1),
-             ResidualConvolution(256, 128, 2, 1),
-             ResidualConvolution(512, 256, 2, 1),
-             ResidualConvolution(1024, 512, 2, 1),
-             ResidualConvolution(2048, 1024, 2, 1),
+             ResidualConvolution(d_model, 3, 1)
              ])
 
-        self.mha_encoders = [keras.Sequential([ResidualConvolution(d_model, 2048, 2, 1),
-                                               ResidualConvolution(d_model, d_model, 2, 1),
-                                               keras.layers.Lambda(lambda x: x + self.pos_encoding*0.1)] +
-                                              [Encoder(d_model, 8, 8, 8)] * 8)]*n_specialists
+        self.calibration_1 = [keras.Sequential([keras.layers.GlobalAvgPool2D(),
+                                                keras.layers.Dense(d_model, activation='gelu'),
+                                                keras.layers.BatchNormalization(),
+                                                keras.layers.Dense(d_model, activation='gelu'),
+                                                keras.layers.BatchNormalization(),
+                                                keras.layers.Dense(d_model, activation='sigmoid'),
+                                                keras.layers.Reshape([1, 1, d_model])])] * n_specialists
 
-        self.move = keras.Sequential([keras.layers.BatchNormalization(),
+        self.mha_encoders = [keras.Sequential([Encoder(d_model, 4, 8, 8)]*n_encoders)]*n_specialists
+
+        self.calibration_2 = keras.Sequential([keras.layers.GlobalAvgPool2D(),
+                                               keras.layers.Dense(d_model*n_specialists, activation='gelu'),
+                                               keras.layers.BatchNormalization(),
+                                               keras.layers.Dense(d_model*n_specialists//4, activation='gelu'),
+                                               keras.layers.BatchNormalization(),
+                                               keras.layers.Dense(d_model*n_specialists, activation='sigmoid'),
+                                               keras.layers.Reshape([1, 1, d_model*n_specialists])])
+
+        self.move = keras.Sequential([keras.layers.GlobalAvgPool2D(),
                                       keras.layers.Dense(4098, activation='softmax')])
 
-        self.global_avg_pool = keras.layers.Flatten()
+        self.flatten = keras.layers.Flatten()
 
     def call(self, x):
-        x = self.convolutions(x)  # Shape: (batch_size, 8, 8, d_model)
-        #x = x + self.pos_encoding
+        x = self.convolutions(x)
 
-        encoders_output = [specialist(x) for specialist in self.mha_encoders]
+        pre_mha = [se(x)*x + self.pos_encoding for se in self.calibration_1]
 
-        x = tf.concat(encoders_output, axis=-1)
-        x = self.global_avg_pool(x)
+        specialists_result = [encoder(pre_mha) for encoder, pre_mha in zip(self.mha_encoders, pre_mha)]
+
+        x = tf.concat(specialists_result, axis=-1)
+        x = self.calibration_2(x) * x
+        #x = self.flatten(x)
 
         move_probabilities = self.move(x)  # Shape: (batch_size, 4098)
         return move_probabilities
@@ -249,24 +265,24 @@ class Xadrezia(keras.Model):
                          ▼
             ┌────────────────────────────┐
             │   Convolutional Stack      │
-            │----------------------------│◄── Feature extraction
-            │   Conv2D + BN + GELU       │
+            │----------------------------│
+            │   Conv2D + BN + GELU       │ ◄── Feature extraction
             │   SE-ResidualConv x 6      │
             │   (progressively deepens)  │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │Multi-Head Specialists [xN]:│ ◄── 𝙥𝙖𝙧𝙖𝙡𝙡𝙚𝙡 branches
+            │Multi-Head Specialists [xN]:│
             │----------------------------│
-            │ - SE-ResidualConv (d_model)│
+            │ - SE-ResidualConv (d_model)│◄── Feature extraction
             │ - PosEnc fusion            │
             │ - Transformer Encoders x6  │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │     Concatenate Features   │ ◄── Combines all specialists
+            │     Concatenate Features   │ ◄── Combines all specialists results
             └────────────┬───────────────┘
                          │
                          ▼
@@ -276,7 +292,8 @@ class Xadrezia(keras.Model):
                          │
                          ▼
             ┌────────────────────────────┐
-            │       Dense (4098 units)   │ ◄── Output: move probabilities
-            │       Activation: softmax  │
+            │         Dense Block        │
+            │            With            │ ◄── Output: move probabilities
+            │      Softmax Activation    │ 
             └────────────────────────────┘
 """

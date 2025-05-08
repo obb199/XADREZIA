@@ -1,9 +1,9 @@
-import tensorflow as tf
 import keras
 import numpy as np
 from generate_training_data import transposition, find_piece
 from table import generate_start_table
 from move_dict import MOVE_TO_IDX, VALID_MOVES
+from table import show_pieces
 
 
 class DataGenerator(keras.utils.Sequence):
@@ -129,18 +129,17 @@ class DataGenerator(keras.utils.Sequence):
                     if move == 'O-O':
                         pred_move = 'O-O'
                     elif move == 'O-O-O':
-                        pred_move = 'O-O' == 'O-O-O'
+                        pred_move = 'O-O-O'
                     else:
                         col, line = find_piece(board_state, move, is_white)
                         pred_move = cols_convertion[col]+str(line)
 
                         pred_move = pred_move + move[-2:]
-
-                    if pred_move in VALID_MOVES and board_state not in X:
+                    if pred_move in VALID_MOVES:
                         X.append(board_state)
                         y.append(pred_move)
 
             except Exception as e:
-                return X, y
+                break
 
         return X, y
