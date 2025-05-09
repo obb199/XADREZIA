@@ -1,4 +1,6 @@
 .idea/
 __pycache__/
 matches/
-weights.weights.h5
+weights_1.weights.h5
+weights_2.weights.h5
+weights_3.weights.h5

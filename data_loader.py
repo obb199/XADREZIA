@@ -2,8 +2,8 @@ import keras
 import numpy as np
 from generate_training_data import transposition, find_piece
 from table import generate_start_table
-from move_dict import MOVE_TO_IDX, VALID_MOVES
-from pieces import COLS_CONVERTION
+from moves import MOVE_TO_IDX, VALID_MOVES
+from convertions import COLS_CONVERTION
 
 
 class DataGenerator(keras.utils.Sequence):
@@ -62,8 +62,6 @@ class DataGenerator(keras.utils.Sequence):
 
         for idx in sorted_idx:
             table = np.array(X[idx])
-            #table[table == 0] = -1
-
             final_X.append(table)
             sparse_res = np.zeros(4098)
             sparse_res[MOVE_TO_IDX[y[idx]]] = 1

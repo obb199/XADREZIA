@@ -1,9 +1,9 @@
 from generate_training_data import transposition, find_piece, sequence_of_moves, generate_uniques_matches
 from table import generate_start_table
-from move_dict import VALID_MOVES
+from moves import VALID_MOVES
 import os
 import numpy as np
-from pieces import COLS_CONVERTION
+from convertions import COLS_CONVERTION
 
 
 def clean_data(for_white_generation):

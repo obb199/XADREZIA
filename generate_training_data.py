@@ -3,7 +3,7 @@ from pieces import (
     EMPTY, WHITE_PAWN, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN, WHITE_KING,
     BLACK_PAWN, BLACK_KNIGHT, BLACK_BISHOP, BLACK_ROOK, BLACK_QUEEN, BLACK_KING
 )
-from pieces import NOTE_CONVERTION, WHITE_CONVERTION, BLACK_CONVERTION
+from convertions import NOTE_CONVERTION, WHITE_CONVERTION, BLACK_CONVERTION
 
 
 def generate_uniques_matches(input_path, only_white=True, only_black=False):
