@@ -15,6 +15,8 @@ def generate_uniques_matches(input_path, only_white=True, only_black=False):
 
         Returns:
             Lista de strings, onde cada string representa uma partida única sem informações de resultado.
+            :param only_white: capturar apenas as jogadas do branco.
+            :param only_black: capturar apenas as jogadas do preto.
         """
     def data_filter(data):
         return True if data[0] != '[' and data[0] != '\n' else False
@@ -113,6 +115,7 @@ def find_controlled_squares(table, i, j):
         Returns:
             Tupla contendo (lista de quadrados controlados, informações da peça).
         """
+
     if compare_pieces(table[i, j], WHITE_PAWN) or compare_pieces(table[i, j], BLACK_PAWN):
         return pawn_control(i, j, True) if table[i, j, -1] == 1 else pawn_control(i, j, False)
     if compare_pieces(table[i, j, :-1], WHITE_KNIGHT[:-1]):
@@ -123,7 +126,7 @@ def find_controlled_squares(table, i, j):
         return rook_control(table, i, j)
     if compare_pieces(table[i, j, :-1], WHITE_QUEEN[:-1]):
         return queen_control(table, i, j)
-    if compare_pieces(table[i,j, :-1], WHITE_KING[:-1]):
+    if compare_pieces(table[i, j, :-1], WHITE_KING[:-1]):
         return king_control(i, j)
 
 

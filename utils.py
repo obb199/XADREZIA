@@ -9,7 +9,7 @@ def clean_data(for_white_generation):
     cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
                        4: 'e', 5: 'f', 6: 'g', 7: 'h'}
 
-    FILEPATH = '/home/user/PycharmProjects/chess_engine/matches/'
+    FILEPATH = '/matches/'
     matches = [FILEPATH + path for path in os.listdir(FILEPATH)]
     processed_matches = []
     for player_matches in matches:
@@ -21,9 +21,6 @@ def clean_data(for_white_generation):
         boardgame = generate_start_table()
         # Generate data
         for idx, move in enumerate(moves):
-            if move == '' or '1-' in move or '-1' in move:
-                break
-
             is_white = True if idx % 2 == 0 else False
             board_state = boardgame.copy()
 
@@ -34,9 +31,11 @@ def clean_data(for_white_generation):
                     move = move.replace('+', '').replace('#', '').replace('x', '')
 
                     if move == 'O-O':
-                        continue
+                        correct_games.append(sequence_of_moves(g))
+                        break
                     elif move == 'O-O-O':
-                        continue
+                        correct_games.append(sequence_of_moves(g))
+                        break
                     else:
                         col, line = find_piece(board_state, move, is_white)
                         pred_move = cols_convertion[col] + str(line)

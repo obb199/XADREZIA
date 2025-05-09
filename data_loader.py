@@ -3,7 +3,6 @@ import numpy as np
 from generate_training_data import transposition, find_piece
 from table import generate_start_table
 from move_dict import MOVE_TO_IDX, VALID_MOVES
-from table import show_pieces
 
 
 class DataGenerator(keras.utils.Sequence):
@@ -56,12 +55,15 @@ class DataGenerator(keras.utils.Sequence):
         Returns:
             Tuple containing (processed input data, labels in one-hot format).
 """
-        sorted_idx = np.random.randint(low=0, high=len(X), size=self.moves_per_game)
+        sorted_idx = np.random.randint(low=0, high=len(X), size=min(self.moves_per_game, len(X)))
 
         final_X, final_y = [], []
 
         for idx in sorted_idx:
-            final_X.append(X[idx])
+            table = np.array(X[idx])
+            #table[table == 0] = -1
+
+            final_X.append(table)
             sparse_res = np.zeros(4098)
             sparse_res[MOVE_TO_IDX[y[idx]]] = 1
             final_y.append(sparse_res)
