@@ -254,7 +254,7 @@ class Xadrezia(keras.Model):
             call(x): Processes the input and returns concatenated predictions.
 """
 
-    def __init__(self, height=8, width=8, base_params=512, encoders_per_group=16, **kwargs):
+    def __init__(self, height=8, width=8, base_params=256, encoders_per_group=32, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.base_params = base_params
         self.pos_encoding = get_positional_encoding(height, width, base_params)

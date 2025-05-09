@@ -9,7 +9,7 @@ def clean_data(for_white_generation):
     cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
                        4: 'e', 5: 'f', 6: 'g', 7: 'h'}
 
-    FILEPATH = '/matches/'
+    FILEPATH = '/home/user/PycharmProjects/chess_engine/matches/'
     matches = [FILEPATH + path for path in os.listdir(FILEPATH)]
     processed_matches = []
     for player_matches in matches:
