@@ -116,11 +116,12 @@ A saída do Transformer é processada por camadas densas para produzir o vetor d
                          ▼
             ┌────────────────────────────┐
             │    Encoder Stack [x32]     │
-            │----------------------------│
+            │----------------------------│ 
             │     MultiHeadAttention     │
-            │    LayerNorm + Residual    │ ◄── Self-attention with 16 heads
+            │    LayerNorm + Residual    │  ◄── Self-attention with 16 heads
             │    FFN (ReLU + Dropout)    │
             │    LayerNorm + Residual    │
+            │     Residual addition      │
             └────────────┬───────────────┘
                          │
                          ▼
