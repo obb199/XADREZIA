@@ -233,8 +233,7 @@ class ResidualConvolution(keras.layers.Layer):
 class WeightedAverage(keras.layers.Layer):
     def __init__(self, base_params, **kwargs):
         super(WeightedAverage, self).__init__(**kwargs)
-        # Use a smaller weight tensor, e.g., per channel
-        self.weights_for_avg = tf.Variable(tf.random.normal([1, 1, base_params]), trainable=True)
+        self.weights_for_avg = tf.Variable(tf.random.normal([8, 8, base_params]), trainable=True)
         self.avg = keras.layers.GlobalAvgPool2D()
 
     def call(self, x):
@@ -254,9 +253,10 @@ class Xadrezia(keras.Model):
             call(x): Processes the input and returns concatenated predictions.
 """
 
-    def __init__(self, height=8, width=8, base_params=256, encoders_per_group=32, **kwargs):
+    def __init__(self, height=8, width=8, base_params=256, n_encoders=32, **kwargs):
         super(Xadrezia, self).__init__(**kwargs)
         self.base_params = base_params
+        self.n_encoders = n_encoders
         self.pos_encoding = get_positional_encoding(height, width, base_params)
         self.convolutions = keras.Sequential(
             [keras.layers.Conv2D(base_params // 4, kernel_size=5, padding='same', strides=1, use_bias=False),
@@ -265,60 +265,76 @@ class Xadrezia(keras.Model):
              ResidualConvolution(base_params // 4),
              ])
 
-        self.encoders = [Encoder(base_params, 8, 8, 8)] * encoders_per_group
-
-        self.weighted_average = WeightedAverage(base_params)
+        self.encoders = [Encoder(base_params, 16, 8, 8)] * n_encoders
+        self.weighted_global_average = WeightedAverage(base_params)
 
         self.move = keras.Sequential([keras.layers.Dense(4098, activation='softmax')])
 
     def call(self, x):
         x = self.convolutions(x)
         x = x + self.pos_encoding
-        prev_result = x
+        prev_result = tf.identity(x)
         for encoder in self.encoders:
             x = encoder(x) + prev_result
-            prev_result = x
-        x = self.weighted_average(x)
+            prev_result = tf.identity(x)
+        x = self.weighted_global_average(x)
         move_probabilities = self.move(x)  # Shape: (batch_size, 4098)
         return move_probabilities
 
+
 """
+
             ┌────────────────────────────┐
-            │        Input (8x8x7)       │
+            │       Input (8x8x7)        │ ◄── Board representation.
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │   Convolutional Stack      │
+            │    Convolutional Layer     │
             │----------------------------│
-            │   Conv2D + BN + GELU       │ ◄── Feature extraction
-            │   SE-ResidualConv x 6      │
-            │   (progressively deepens)  │
+            │      Conv2D (32, 5x5)      │ ◄── Initial feature extraction with basic convolution.
+            │ BatchNormalizaztion + ReLU │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐             
+            │    ResidualInception-SE    │
+            │----------------------------│ ◄── Parallel convolution with different
+            │    Residual Convolution    │       kernels followed by squeeze and
+            │   (4 parallel conv paths)  │         excitation and residual sum.
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │Multi-Head Specialists [xN]:│
+            │   Positional Encoding      │
             │----------------------------│
-            │ - SE-ResidualConv (d_model)│◄── Feature extraction
-            │ - PosEnc fusion            │
-            │ - Transformer Encoders x6  │
+            │     2D PosEnc (8x8x256)    │ ◄── Adds spatial context.
+            │   Added to conv features   │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │     Concatenate Features   │ ◄── Combines all specialists results
+            │    Encoder Stack [x32]     │
+            │----------------------------│
+            │     MultiHeadAttention     │
+            │    LayerNorm + Residual    │
+            │    FFN (ReLU + Dropout)    │ ◄── Self-attention with 16 heads and residual sum.
+            │    LayerNorm + Residual    │
+            │  Residual with last output │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │          Flatten           │
+            │      Weighted Average      │
+            │----------------------------│◄── Aggregates features with trainable
+            │     Product by weights     │   weighted average for filters division.
+            │      GlobalAvgPool2D       │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │         Dense Block        │
-            │            With            │ ◄── Output: move probabilities
-            │      Softmax Activation    │ 
+            │    Output Probabilities    │
+            │----------------------------│ ◄── Output: move probabilities.
+            │   Dense (4098, softmax)    │
             └────────────────────────────┘
 """

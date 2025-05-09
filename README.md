@@ -87,41 +87,54 @@ Usa atenção multi-cabeça (multi-head attention) para priorizar informações 
 A saída do Transformer é processada por camadas densas para produzir o vetor de probabilidades, que é decodificando em um lance.
 
             ┌────────────────────────────┐
-            │        Input (8x8x7)       │◄── Board representation
+            │       Input (8x8x7)        │ ◄── Board representation
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │   Convolutional Stack      │
-            │----------------------------│◄── Feature extraction
-            │ - Conv2D + BN + GELU       │
-            │ - SE-ResidualConv x 6      │
-            │  (progressively deepens)   │
-            └────────────┬───────────────┘
-                         │
-                         ▼
-            ┌────────────────────────────┐
-            │Multi-Head Specialists [xN]:│ ◄── 𝙥𝙖𝙧𝙖𝙡𝙡𝙚𝙡 branches
+            │    Convolutional Layer     │
             │----------------------------│
-            │ - SE-ResidualConv (d_model)│
-            │ - PosEnc fusion            │
-            │ - Transformer Encoders x6  │
+            │      Conv2D (32, 5x5)      │ ◄── Initial feature extraction
+            │ BatchNormalizaztion + ReLU │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐             
+            │        Inception-SE        │
+            │    Residual Convolution    │ ◄── Parallel convolution with different
+            │   (4 parallel conv paths)  │       kernels followed by squeeze and
+            └────────────┬───────────────┘         excitation and residual sum.
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │   Positional Encoding      │
+            │----------------------------│
+            │     2D PosEnc (8x8x256)    │ ◄── Adds spatial context
+            │   Added to conv features   │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │     Concatenate Features   │ ◄── Combines all specialists
+            │    Encoder Stack [x32]     │
+            │----------------------------│
+            │     MultiHeadAttention     │
+            │    LayerNorm + Residual    │ ◄── Self-attention with 16 heads
+            │    FFN (ReLU + Dropout)    │
+            │    LayerNorm + Residual    │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │          Flatten           │
+            │      Weighted Average      │
+            │----------------------------│◄── Aggregates features with trainable
+            │     Product by weights     │   weighted average for filters division.
+            │      GlobalAvgPool2D       │
             └────────────┬───────────────┘
                          │
                          ▼
             ┌────────────────────────────┐
-            │       Dense (4098 units)   │ ◄── Output: move probabilities
-            │       Activation: softmax  │
+            │         Dense Head         │
+            │----------------------------│ ◄── Output: move probabilities
+            │   Dense (4098, softmax)    │
             └────────────────────────────┘
-
 ![engine vs human](https://sdmntprwestus.oaiusercontent.com/files/00000000-f1f8-6230-98b5-085b88fc7147/raw?se=2025-05-02T22%3A22%3A50Z&sp=r&sv=2024-08-04&sr=b&scid=b77e90ee-bb50-5c51-bf70-d52d9bb7c754&skoid=51916beb-8d6a-49b8-8b29-ca48ed86557e&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-05-02T20%3A37%3A35Z&ske=2025-05-03T20%3A37%3A35Z&sks=b&skv=2024-08-04&sig=sMeg9UmUBNngent2CRI/Z7HXn5yJaViJjZr%2B85OW5BM%3D)

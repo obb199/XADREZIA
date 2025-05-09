@@ -3,12 +3,10 @@ from table import generate_start_table
 from move_dict import VALID_MOVES
 import os
 import numpy as np
+from pieces import COLS_CONVERTION
 
 
 def clean_data(for_white_generation):
-    cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
-                       4: 'e', 5: 'f', 6: 'g', 7: 'h'}
-
     FILEPATH = '/home/user/PycharmProjects/chess_engine/matches/'
     matches = [FILEPATH + path for path in os.listdir(FILEPATH)]
     processed_matches = []
@@ -38,7 +36,7 @@ def clean_data(for_white_generation):
                         break
                     else:
                         col, line = find_piece(board_state, move, is_white)
-                        pred_move = cols_convertion[col] + str(line)
+                        pred_move = COLS_CONVERTION[col] + str(line)
                         pred_move = pred_move + move[-2:]
 
                     if pred_move in VALID_MOVES:

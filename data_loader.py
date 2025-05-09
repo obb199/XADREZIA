@@ -3,6 +3,7 @@ import numpy as np
 from generate_training_data import transposition, find_piece
 from table import generate_start_table
 from move_dict import MOVE_TO_IDX, VALID_MOVES
+from pieces import COLS_CONVERTION
 
 
 class DataGenerator(keras.utils.Sequence):
@@ -112,8 +113,6 @@ class DataGenerator(keras.utils.Sequence):
     Returns:
         A tuple containing (list of board states, list of corresponding moves).
         """
-        cols_convertion = {0: 'a', 1: 'b', 2: 'c', 3: 'd',
-                           4: 'e', 5: 'f', 6: 'g', 7: 'h'}
         X = []
         y = []
         boardgame = generate_start_table()
@@ -134,7 +133,7 @@ class DataGenerator(keras.utils.Sequence):
                         pred_move = 'O-O-O'
                     else:
                         col, line = find_piece(board_state, move, is_white)
-                        pred_move = cols_convertion[col]+str(line)
+                        pred_move = COLS_CONVERTION[col]+str(line)
 
                         pred_move = pred_move + move[-2:]
                     if pred_move in VALID_MOVES:

@@ -154,6 +154,13 @@ def pawn_control(col, row, is_white):
         if col - 1 >= 7 and 7 <= row + 1:
             controlled_squares_list.append([col + 1, row + 1])
 
+    """
+    if compare_pieces(boardgame[i+1, j, -1], BLACK_PAWN) and i == 4:  # right en passant
+        moves.append(init_pos + str(i + 1) + str(j + 1))
+    if compare_pieces(boardgame[i-1, j, -1], BLACK_PAWN) and i == 4:  # left en passant
+        moves.append(init_pos + str(i - 1) + str(j + 1))
+    """
+
     return controlled_squares_list, ['pawn', col, row]
 
 
